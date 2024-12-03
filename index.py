@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory,render_template
 from flask_cors import CORS
-from dotenv import load_dotenv
+from flask_sqlalchemy import SQLAlchemy
 import os
 import uuid
 import json
@@ -9,9 +9,10 @@ import ffmpeg
 import logging
 import random
 import time
+from datetime import datetime
+from dotenv import load_dotenv
 import boto3
 from botocore.exceptions import NoCredentialsError
-from models import db, Video, create_db  # Import db and create_db from models.py
 
 # Load environment variables from .env file
 load_dotenv()
@@ -19,7 +20,6 @@ load_dotenv()
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Initialize Flask app
 app = Flask(__name__)
 CORS(app)
 
@@ -37,12 +37,12 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URI
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Initialize the database
-db.init_app(app)
-
 # Ensure upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+# Initialize the database
+db = SQLAlchemy(app)
 
 # Initialize S3 client
 s3_client = boto3.client(
@@ -52,13 +52,26 @@ s3_client = boto3.client(
     region_name=AWS_S3_REGION
 )
 
+# Define Video model for database
+class Video(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    video_url = db.Column(db.String(500), nullable=False)
+    segment_length = db.Column(db.Integer, nullable=False)
+    file_urls = db.Column(db.Text, nullable=False)  # JSON list of file URLs
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __init__(self, video_url, segment_length, file_urls):
+        self.video_url = video_url
+        self.segment_length = segment_length
+        self.file_urls = file_urls
+
 # Create database tables
-create_db(app)
+with app.app_context():
+    db.create_all()
 
 @app.route('/')
 def index():
     return render_template('index.html')
-
 
 # Helper function to download a YouTube video
 def download_video_file(video_url, output_path):
@@ -102,7 +115,7 @@ def process_video_task(video_url, segment_length):
     try:
         probe = ffmpeg.probe(video_file, v='error', select_streams='v:0', show_entries='stream=duration')
         duration = float(probe['streams'][0]['duration'])
-    except Exception as e:
+    except ffmpeg.Error as e:
         return {'error': 'Error probing video duration', 'details': str(e)}
 
     file_urls = []
@@ -113,7 +126,7 @@ def process_video_task(video_url, segment_length):
             s3_url = upload_to_s3(short_file, os.path.basename(short_file))
             if s3_url:
                 file_urls.append(s3_url)
-        except Exception as e:
+        except ffmpeg.Error as e:
             logging.error(f"Error processing video segment: {e}")
             return {'error': 'Error processing video segment', 'details': str(e)}
 
@@ -150,7 +163,16 @@ def process_video():
 @app.route('/list-videos', methods=['GET'])
 def list_videos():
     videos = Video.query.all()
-    video_list = [video.to_dict() for video in videos]
+    video_list = [
+        {
+            'id': video.id,
+            'video_url': video.video_url,
+            'segment_length': video.segment_length,
+            'file_urls': json.loads(video.file_urls),
+            'created_at': video.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        for video in videos
+    ]
     return jsonify(video_list)
 
 if __name__ == '__main__':
