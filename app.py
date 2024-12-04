@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory,render_template
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
@@ -25,7 +25,7 @@ CORS(app)
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
-COOKIE_FILE = os.getenv('COOKIE_FILE')  # YouTube cookies file path
+COOKIE_FILE = os.getenv('COOKIE_FILE')  # Optional: Cookies file for authenticated requests
 DATABASE_URI = os.getenv('DATABASE_URI')  # Database connection URI
 AWS_S3_BUCKET = os.getenv('AWS_S3_BUCKET')  # AWS S3 bucket name
 AWS_S3_REGION = os.getenv('AWS_S3_REGION')  # AWS S3 region
@@ -59,13 +59,12 @@ create_db(app)
 def index():
     return render_template('index.html')
 
-
-# Helper function to download a YouTube video
-def download_video_file(video_url, output_path):
+# Helper function to download a video from a URL (YouTube, Instagram, Facebook)
+def download_social_video(video_url, output_path):
     ydl_opts = {
         'outtmpl': output_path,
         'format': 'mp4',
-        'cookiefile': COOKIE_FILE,  # Use YouTube cookies
+        'cookiefile': COOKIE_FILE,  # Optional: Use cookies for authenticated downloads
         'verbose': True,
     }
     try:
@@ -88,59 +87,44 @@ def upload_to_s3(file_path, file_name):
         logging.error(f"Error uploading to S3: {e}")
         return None
 
-# Helper function to process a video
-def process_video_task(video_url, segment_length):
-    video_file = os.path.join(UPLOAD_FOLDER, f"video_{uuid.uuid4().hex}.mp4")
-    time.sleep(random.uniform(1, 3))  # Simulate delay
-
+# Helper function to download and upload a video from Instagram or Facebook
+def download_and_upload_social_video(video_url):
+    video_file = os.path.join(UPLOAD_FOLDER, f"social_{uuid.uuid4().hex}.mp4")
     try:
-        download_video_file(video_url, video_file)
+        download_social_video(video_url, video_file)
+        s3_url = upload_to_s3(video_file, os.path.basename(video_file))
+        return {'videoUrl': s3_url} if s3_url else {'error': 'Failed to upload video'}
     except Exception as e:
         return {'error': 'Error downloading video', 'details': str(e)}
+    finally:
+        if os.path.exists(video_file):
+            os.remove(video_file)
 
-    # Probe video duration
-    try:
-        probe = ffmpeg.probe(video_file, v='error', select_streams='v:0', show_entries='stream=duration')
-        duration = float(probe['streams'][0]['duration'])
-    except Exception as e:
-        return {'error': 'Error probing video duration', 'details': str(e)}
-
-    file_urls = []
-    for start_time in range(0, int(duration), segment_length):
-        short_file = os.path.join(UPLOAD_FOLDER, f"short_{uuid.uuid4().hex}.mp4")
-        try:
-            ffmpeg.input(video_file, ss=start_time, t=segment_length).output(short_file).run(overwrite_output=True)
-            s3_url = upload_to_s3(short_file, os.path.basename(short_file))
-            if s3_url:
-                file_urls.append(s3_url)
-        except Exception as e:
-            logging.error(f"Error processing video segment: {e}")
-            return {'error': 'Error processing video segment', 'details': str(e)}
-
-    os.remove(video_file)
-    video_record = Video(video_url=video_url, segment_length=segment_length, file_urls=json.dumps(file_urls))
-    db.session.add(video_record)
-    db.session.commit()
-    return {'fileUrls': file_urls}
-
-# Endpoint to process video
-@app.route('/process-video', methods=['POST'])
-def process_video():
+# Endpoint to download Instagram stories, reels, or posts
+@app.route('/download-instagram', methods=['POST'])
+def download_instagram():
     data = request.json
     video_url = data.get('url')
-    segment_length = data.get('segment_length', 60)
 
     if not video_url:
         return jsonify({'error': 'Missing video URL.'}), 400
 
-    try:
-        segment_length = int(segment_length)
-        if segment_length <= 0:
-            raise ValueError("Segment length must be positive.")
-    except ValueError as e:
-        return jsonify({'error': 'Invalid segment length.', 'details': str(e)}), 400
+    result = download_and_upload_social_video(video_url)
+    if 'error' in result:
+        return jsonify(result), 500
 
-    result = process_video_task(video_url, segment_length)
+    return jsonify(result)
+
+# Endpoint to download Facebook stories, reels, or posts
+@app.route('/download-facebook', methods=['POST'])
+def download_facebook():
+    data = request.json
+    video_url = data.get('url')
+
+    if not video_url:
+        return jsonify({'error': 'Missing video URL.'}), 400
+
+    result = download_and_upload_social_video(video_url)
     if 'error' in result:
         return jsonify(result), 500
 
@@ -152,6 +136,20 @@ def list_videos():
     videos = Video.query.all()
     video_list = [video.to_dict() for video in videos]
     return jsonify(video_list)
+
+@app.route('/get-presigned-url', methods=['GET'])
+def get_presigned_url():
+    file_key = request.args.get('file_key')  # Example: short_795af7cb9456400abbc9f1bad5c2b11d.mp4
+
+    try:
+        # Generate a pre-signed URL valid for 1 hour
+        url = s3_client.generate_presigned_url('get_object',
+                                        Params={'Bucket': os.getenv('AWS_S3_BUCKET'), 'Key': file_key},
+                                        ExpiresIn=3600)
+        return jsonify({'url': url})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
