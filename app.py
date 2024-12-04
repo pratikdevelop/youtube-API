@@ -5,13 +5,12 @@ import os
 import uuid
 import json
 import yt_dlp as youtube_dl
-import ffmpeg
 import logging
 import random
 import time
 import boto3
 from botocore.exceptions import NoCredentialsError
-from models import db, Video, create_db  # Import db and create_db from models.py
+from flask_pymongo import PyMongo
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,7 +25,7 @@ CORS(app)
 # Configuration
 UPLOAD_FOLDER = 'uploads'
 COOKIE_FILE = os.getenv('COOKIE_FILE')  # Optional: Cookies file for authenticated requests
-DATABASE_URI = os.getenv('DATABASE_URI')  # Database connection URI
+MONGO_URI = os.getenv('MONGO_URI')  # MongoDB connection URI
 AWS_S3_BUCKET = os.getenv('AWS_S3_BUCKET')  # AWS S3 bucket name
 AWS_S3_REGION = os.getenv('AWS_S3_REGION')  # AWS S3 region
 AWS_ACCESS_KEY = os.getenv('AWS_ACCESS_KEY')  # AWS access key
@@ -34,11 +33,10 @@ AWS_SECRET_KEY = os.getenv('AWS_SECRET_KEY')  # AWS secret key
 
 # Flask configurations
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URI
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MONGO_URI'] = MONGO_URI
 
-# Initialize the database
-db.init_app(app)
+# Initialize PyMongo (MongoDB client)
+mongo = PyMongo(app)
 
 # Ensure upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
@@ -51,13 +49,6 @@ s3_client = boto3.client(
     aws_secret_access_key=AWS_SECRET_KEY,
     region_name=AWS_S3_REGION
 )
-
-# Create database tables
-create_db(app)
-
-@app.route('/')
-def index():
-    return render_template('index.html')
 
 # Helper function to download a video from a URL (YouTube, Instagram, Facebook)
 def download_social_video(video_url, output_path):
@@ -113,6 +104,15 @@ def download_instagram():
     if 'error' in result:
         return jsonify(result), 500
 
+    # Save to MongoDB
+    video_data = {
+        'platform': 'instagram',
+        'video_url': result['videoUrl'],
+        'file_urls': [result['videoUrl']],
+        'created_at': time.time()
+    }
+    mongo.db.videos.insert_one(video_data)  # Save to MongoDB collection 'videos'
+
     return jsonify(result)
 
 # Endpoint to download Facebook stories, reels, or posts
@@ -128,13 +128,29 @@ def download_facebook():
     if 'error' in result:
         return jsonify(result), 500
 
+    # Save to MongoDB
+    video_data = {
+        'platform': 'facebook',
+        'video_url': result['videoUrl'],
+        'file_urls': [result['videoUrl']],
+        'created_at': time.time()
+    }
+    mongo.db.videos.insert_one(video_data)  # Save to MongoDB collection 'videos'
+
     return jsonify(result)
 
 # Endpoint to list processed videos
 @app.route('/list-videos', methods=['GET'])
 def list_videos():
-    videos = Video.query.all()
-    video_list = [video.to_dict() for video in videos]
+    videos = mongo.db.videos.find()  # Fetch all videos from MongoDB
+    video_list = []
+    for video in videos:
+        video_list.append({
+            'platform': video['platform'],
+            'video_url': video['video_url'],
+            'file_urls': video['file_urls'],
+            'created_at': video['created_at']
+        })
     return jsonify(video_list)
 
 @app.route('/get-presigned-url', methods=['GET'])
