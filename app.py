@@ -10,7 +10,7 @@ from flask_pymongo import PyMongo
 from datetime import datetime
 import boto3
 from botocore.exceptions import NoCredentialsError
-from moviepy.editor import VideoFileClip
+from moviepy import VideoFileClip
 
 
 # Load environment variables from .env file
