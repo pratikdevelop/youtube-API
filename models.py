@@ -1,12 +1,19 @@
+# database.py
+
 from flask_pymongo import PyMongo
 from datetime import datetime
 import json
-import uuid
+import logging
 
-# Initialize MongoDB client
+# Initialize PyMongo (MongoDB client)
 mongo = None
 
-# Define Video model for MongoDB
+def init_db(app):
+    global mongo
+    mongo = PyMongo(app)  # Initialize PyMongo with the app
+    # Ensure the video collection is available in MongoDB
+    mongo.db.videos.create_index([('video_url', 1)], unique=True)
+
 class Video:
     def __init__(self, video_url, segment_length, file_urls):
         self.video_url = video_url
@@ -23,14 +30,6 @@ class Video:
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
         }
 
-# Helper method to initialize MongoDB client (replace 'db' with 'mongo')
-def create_db(app):
-    global mongo
-    mongo = PyMongo(app)  # Initialize PyMongo with the app
-    # Ensure the video collection is available in MongoDB
-    mongo.db.videos.create_index([('video_url', 1)], unique=True)
-
-# Helper method to add a video to the MongoDB
 def save_video(video_url, segment_length, file_urls):
     video = Video(video_url, segment_length, file_urls)
     video_data = video.to_dict()
@@ -40,13 +39,12 @@ def save_video(video_url, segment_length, file_urls):
         mongo.db.videos.insert_one(video_data)
     except Exception as e:
         # Handle insertion failure
-        print(f"Error inserting video: {str(e)}")
+        logging.error(f"Error inserting video: {str(e)}")
         return None
 
     return video_data
 
-# Helper method to list all processed videos from MongoDB
-def list_videos():
+def get_all_videos():
     videos = mongo.db.videos.find()
     video_list = []
     for video in videos:
