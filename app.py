@@ -9,7 +9,7 @@ import uuid
 import boto3
 from botocore.exceptions import NoCredentialsError
 import subprocess
-from models import init_db, save_video, get_all_videos  # Import database functions
+from models import mongo, init_db, save_video, get_all_videos  # Import database functions
 
 # Load environment variables from .env file
 load_dotenv()
@@ -33,9 +33,8 @@ AWS_SECRET_KEY = os.getenv('AWS_SECRET_KEY')  # AWS secret key
 # Flask configurations
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MONGO_URI'] = MONGO_URI
-
-# Initialize the database
-init_db(app)
+if (mongo == None): 
+    init_db(app)
 
 # Ensure the upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
@@ -56,7 +55,7 @@ def download_social_video(video_url, output_path):
 
     # Use cookies for authentication if COOKIE_FILE is provided
     if COOKIE_FILE:
-        ydl_opts['cookies'] = COOKIE_FILE
+        ydl_opts['cookies'] = 'cookies.txt'
     else:
         # Fallback to using cookies from the browser
         ydl_opts['cookiesfrombrowser'] = ('chrome',)
@@ -113,7 +112,7 @@ def download_youtube():
 
     # Download video using yt-dlp
     try:
-        # download_social_video(video_url, video_file)
+        download_social_video(video_url, video_file)
 
         # Check if the file was downloaded
         if not os.path.exists(video_file):
