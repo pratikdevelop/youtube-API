@@ -56,7 +56,7 @@ def download_social_video(video_url, output_path):
 
     # Use cookies for authentication if COOKIE_FILE is provided
     if COOKIE_FILE:
-        ydl_opts['cookiefile'] = COOKIE_FILE
+        ydl_opts['cookies'] = COOKIE_FILE
     else:
         # Fallback to using cookies from the browser
         ydl_opts['cookiesfrombrowser'] = ('chrome',)
