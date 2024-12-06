@@ -33,7 +33,8 @@ AWS_SECRET_KEY = os.getenv('AWS_SECRET_KEY')  # AWS secret key
 # Flask configurations
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MONGO_URI'] = MONGO_URI
-if (mongo == None): 
+if (mongo == none): 
+    print('===========================gjkfjgkf')
     init_db(app)
 
 # Ensure the upload folder exists
@@ -54,8 +55,9 @@ def download_social_video(video_url, output_path):
     }
 
     # Use cookies for authentication if COOKIE_FILE is provided
+    cookies_path = os.path.join(os.getcwd(), 'cookies.txt')  # Assumes cookies.txt is in the root folder
     if COOKIE_FILE:
-        ydl_opts['cookies'] = 'cookies.txt'
+        ydl_opts['cookies'] = cookies_path
     else:
         # Fallback to using cookies from the browser
         ydl_opts['cookiesfrombrowser'] = ('chrome',)
@@ -169,6 +171,53 @@ def download_youtube():
     except Exception as e:
         logging.error(f"General error: {e}")
         return jsonify({'error': 'Failed to download or process video', 'details': str(e)}), 500
+    
+
+# New Endpoint: Download Instagram reel or video
+@app.route('/download-instagram', methods=['POST'])
+def download_instagram():
+    data = request.json
+    post_url = data.get('url')
+
+    if not post_url:
+        return jsonify({'error': 'Missing Instagram post URL.'}), 400
+
+    try:
+        # Use instaloader to download the video
+        instaloader_instance = instaloader.Instaloader()
+        
+        # Temporary folder to save the file
+        download_folder = os.path.join(UPLOAD_FOLDER, "instagram")
+        if not os.path.exists(download_folder):
+            os.makedirs(download_folder)
+        
+        # Download the video or reel
+        instaloader_instance.download_post(
+            instaloader.Post.from_shortcode(instaloader_instance.context, post_url.split("/")[-2]),
+            target=download_folder
+        )
+        
+        # Find the downloaded video file
+        downloaded_files = os.listdir(download_folder)
+        video_file = next((file for file in downloaded_files if file.endswith('.mp4')), None)
+        
+        if not video_file:
+            return jsonify({'error': 'Failed to download video.'}), 500
+
+        video_path = os.path.join(download_folder, video_file)
+        
+        # Upload the video to S3
+        s3_url = upload_to_s3(video_path, os.path.basename(video_file))
+
+        # Clean up local files
+        if os.path.exists(video_path):
+            os.remove(video_path)
+
+        return jsonify({'videoUrl': s3_url})
+
+    except Exception as e:
+        logging.error(f"Error downloading Instagram post: {e}")
+        return jsonify({'error': 'Failed to download Instagram post', 'details': str(e)}), 500
 
 @app.route('/list-videos', methods=['GET'])
 def list_videos_route():
