@@ -54,12 +54,7 @@ def download_social_video(video_url, output_path):
         'verbose': True,
     }
 
-    # Use cookies for authentication if COOKIE_FILE is provided
-    if COOKIE_FILE:
-        ydl_opts['cookies'] = COOKIE_FILE
-    else:
-        # Fallback to using cookies from the browser
-        ydl_opts['cookiesfrombrowser'] = ('chrome',)
+    ydl_opts['cookiesfrombrowser'] = ('chrome',)
 
     try:
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
