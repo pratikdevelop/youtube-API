@@ -33,7 +33,7 @@ AWS_SECRET_KEY = os.getenv('AWS_SECRET_KEY')  # AWS secret key
 # Flask configurations
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MONGO_URI'] = MONGO_URI
-if (mongo == none): 
+if (mongo == None): 
     print('===========================gjkfjgkf')
     init_db(app)
 
