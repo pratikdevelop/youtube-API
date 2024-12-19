@@ -616,4 +616,40 @@ def process_video_task(video_url, segment_length):
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+# Function to generate a video from images
+def generate_video(image_paths):
+    video_name = 'mygeneratedvideo.mp4'  # Output video name
+    video_secs = 20  # Duration of the video in seconds
+    num_of_images = len(image_paths)
+
+    # Read the first image to get dimensions for the video
+    frame = cv2.imread(image_paths[0])
+    height, width, layers = frame.shape
+
+    # Create VideoWriter object to write video with correct FPS and frame size
+    video = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'mp4v'), float(num_of_images / video_secs), (width, height))  # 20 FPS
+
+    # Append each image to the video
+    for image_path in image_paths:
+        video.write(cv2.imread(image_path))
+        print(f"Added {image_path} to video")
+
+    # Release the video writer
+    video.release()
+    cv2.destroyAllWindows()
+
+    # Adding audio to the video
+    video_clip = VideoFileClip(video_name)
+    audio_clip = AudioFileClip(os.path.join(app.config['UPLOAD_FOLDER'], "audio.mp3"))
+    audio = CompositeAudioClip([audio_clip])
+    video_clip.audio = audio
+
+    output_video = "output_video_with_audio.mp4"
+    video_clip.write_videofile(output_video)
+
+    print(f"Video generated successfully and saved as {output_video}")
+
+    return output_video
+
 '''

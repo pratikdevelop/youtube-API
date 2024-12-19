@@ -1,4 +1,7 @@
 from io import BytesIO
+import random
+import string
+import time
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -83,7 +86,7 @@ def download_social_video(video_url, output_path, cookies_file=None):
     Downloads a video from a given URL using youtube-dl and saves it to the specified output path.
     """
     if cookies_file is None:
-        cookies_file = os.path.join(os.getcwd(), 'cookies.txt') 
+        cookies_file = os.path.join(UPLOAD_FOLDER, 'cookies.txt') 
 
     # Set options for youtube_dl
     ydl_opts = {
@@ -373,10 +376,16 @@ def resize_images(image_paths):
         im_resized.save(image_path, 'JPEG', quality=95)
         print(f"{image_path} is resized")
 
+def generate_random_string(length=6):
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
-# Function to generate a video from images
+# Define the function that generates a video from a list of image paths and adds audio
 def generate_video(image_paths):
-    video_name = 'mygeneratedvideo.mp4'  # Output video name
+    # Dynamically create a unique video file name using current timestamp and a random string
+    timestamp = int(time.time())  # Get current timestamp for uniqueness
+    random_string = generate_random_string()  # Generate a random string for uniqueness
+    video_name = f"video_{timestamp}_{random_string}.mp4"  # Dynamic video file name
+
     video_secs = 20  # Duration of the video in seconds
     num_of_images = len(image_paths)
 
@@ -402,12 +411,28 @@ def generate_video(image_paths):
     audio = CompositeAudioClip([audio_clip])
     video_clip.audio = audio
 
-    output_video = "output_video_with_audio.mp4"
+    # Output video name with audio (dynamic name)
+    output_video = f"output_{timestamp}_{random_string}.mp4"  # Dynamic output video file name
     video_clip.write_videofile(output_video)
 
     print(f"Video generated successfully and saved as {output_video}")
 
+    # Now upload the video to S3
+    video_path = os.path.join(app.config['UPLOAD_FOLDER'], output_video)  # Video file path to be uploaded
+    video_file = output_video  # The file name for the video on S3
+
+    # Upload to S3
+    s3_url = upload_to_s3(video_path, video_file)
+    file_urls = [s3_url]  # Single URL in this case
+    
+    segment_length = None  # Instagram videos are not segmented by default
+    video_data = save_video(None, segment_length, file_urls)
+
+    print(f"Video uploaded to S3 and saved in the database: {video_data}")
+
     return output_video
+
+    
 
 if __name__ == '__main__':
     app.run(debug=True)
