@@ -410,16 +410,12 @@ def generate_video(image_paths):
     audio_clip = AudioFileClip(os.path.join(app.config['UPLOAD_FOLDER'], "audio.mp3"))
     audio = CompositeAudioClip([audio_clip])
     video_clip.audio = audio
-
-    # Output video name with audio (dynamic name)
     output_video = f"output_{timestamp}_{random_string}.mp4"  # Dynamic output video file name
-    video_clip.write_videofile(output_video)
-
-    print(f"Video generated successfully and saved as {output_video}")
-
-    # Now upload the video to S3
     video_path = os.path.join(app.config['UPLOAD_FOLDER'], output_video)  # Video file path to be uploaded
     video_file = output_video  # The file name for the video on S3
+    video_clip.write_videofile(video_path)
+
+    print(f"Video generated successfully and saved as {output_video}")
 
     # Upload to S3
     s3_url = upload_to_s3(video_path, video_file)
