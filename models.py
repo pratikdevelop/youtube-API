@@ -20,6 +20,8 @@ class Video:
         self.segment_length = segment_length
         self.file_urls = file_urls  # This will be a JSON list of file URLs
         self.created_at = datetime.utcnow()
+        self.updated_at = datetime.utcnow()
+        
 
     def to_dict(self):
         """Helper method to convert Video object to dictionary"""
@@ -37,6 +39,7 @@ def save_video(video_url, segment_length, file_urls):
     # Insert the video data into the MongoDB 'videos' collection
     try:
         mongo.db.videos.insert_one(video_data)
+        return True
     except Exception as e:
         # Handle insertion failure
         logging.error(f"Error inserting video: {str(e)}")
