@@ -102,7 +102,11 @@ def download_social_video(video_url, output_path, cookies_file=None):
     }
 
     # Add cookies configuration if the file exists
-    ydl_opts['cookiesfrombrowser'] = ('chrome',)
+    if os.path.exists(cookies_file):
+        ydl_opts['cookiefile'] = cookies_file
+    else:
+        ydl_opts['cookiesfrombrowser'] = ('chrome',)
+
     try:
         # Download the video
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
