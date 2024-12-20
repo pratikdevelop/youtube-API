@@ -1,0 +1,13 @@
+version: '3.3'
+
+services:
+  python-app:
+    build: .
+    container_name: Youtube-API
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    command: gunicorn --reload app:app
