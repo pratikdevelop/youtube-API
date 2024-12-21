@@ -23,6 +23,8 @@ from PIL import Image
 from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip
 from flask_mail import Message  # For sending emails
 from flask_jwt_extended import JWTManager
+from flask_mail import Mail, Message
+
 
 # Load environment variables
 load_dotenv()
@@ -129,20 +131,17 @@ def download_social_video(video_url, output_path, cookies_file=None):
     """
     if cookies_file is None:
         cookies_file = os.path.join(UPLOAD_FOLDER, 'cookies.txt') 
+    
+    if not os.path.exists(os.path.dirname(output_path)):
+        os.makedirs(os.path.dirname(output_path))
 
     # Set options for youtube_dl
     ydl_opts = {
         'outtmpl': output_path,                   
-        'format': 'bestvideo+bestaudio/best',    
+        'format': 'mp4',    
         'quiet': False,                           
         'verbose': True,                          
         'continuedl': True,         
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.19 Safari/537.36',  # Custom User-Agent
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-us,en;q=0.5',
-            'Sec-Fetch-Mode': 'navigate',
-        },
         'listformats': True,  # List all formats
     }
 
@@ -164,6 +163,7 @@ def download_social_video(video_url, output_path, cookies_file=None):
     
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
+
 # Endpoint: Process video into segments and upload
 @app.route('/process-video', methods=['POST'])
 def process_video():
@@ -198,14 +198,12 @@ def process_video():
 
             subprocess.run([
                 'ffmpeg', '-i', video_file, '-ss', str(start_time), '-to', str(end_time), '-c', 'copy', segment_file
-            ], check=True)
-
-            # Upload segment to S3
+            ], check=True)                # Upload segment to S3
             s3_url = upload_to_s3(segment_file, os.path.basename(segment_file))
             if s3_url:
                 segment_urls.append(s3_url)
 
-            os.remove(segment_file)
+            os.remove(segment_file)  # Clean up segment file after uploading
 
         # Remove the original video file after processing
         os.remove(video_file)
@@ -217,7 +215,7 @@ def process_video():
         return jsonify({'videoSegments': segment_urls})
 
     except Exception as e:
-        logging.error(f"Error processing video: {e}")
+        logging.error(f"Error processing video: {e}, URL: {video_url}, Segment Length: {segment_length}")
         return jsonify({'error': 'Failed to process video', 'details': str(e)}), 500
 
 

@@ -2,30 +2,52 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Social Media Video Downloader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kreon:wght@600&family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script type="text/javascript">
+    window.tailwind.config = {
+      darkMode: ['class'],
+      theme: {
+        extend: {
+          colors: {
+            primary: '#1D4ED8',
+            secondary: '#9333EA',
+            accent: '#2563EB',
+            muted: '#6B7280',
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
   <style>
-    /* Custom Styles */
-    .hero-section {
-      background: url('https://via.placeholder.com/1920x600') no-repeat center center/cover;
-    }
+    *{
+      margin: 0;
+      padding: 0;
 
-    .hero-overlay {
-      background: rgba(0, 0, 0, 0.5);
+      font-family: "Kreon", serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
+  
     }
   </style>
 </head>
 
-<body class="bg-gray-100">
+<body class="bg-gray-50 text-gray-900 font-sans">
   <!-- Navbar -->
   <nav class="bg-blue-600 p-4 shadow-lg">
     <div class="container mx-auto flex justify-between items-center">
       <!-- Logo or Brand Name -->
       <a href="#" class="text-white text-2xl font-bold hover:text-yellow-300 transition duration-300">
-        Social Media Video Downloader
-      </a>
+        SocialClipSaver      </a>
 
       <!-- Mobile Hamburger Menu -->
       <div class="lg:hidden">
@@ -79,68 +101,201 @@
   </nav>
 
   <!-- Hero Section -->
-  <section class="hero-section hero-overlay py-24" id="home">
-    <div class="container mx-auto text-center text-white">
-      <h1 class="text-4xl md:text-5xl font-bold mb-4">
-        Download Videos from Your Favorite Platforms
-      </h1>
-      <p class="text-lg md:text-xl mb-6">
-        Easily download and process videos from YouTube, Instagram, and Facebook with just a few clicks! Save your
-        favorite content instantly and start sharing today.
-      </p>
-      <a href="#videoProcessor"
-        class="px-8 py-4 bg-blue-600 text-white text-lg rounded-md hover:bg-blue-500 transition duration-300">
-        Get Started
-      </a>
-    </div>
-  </section>
-
-  <!-- Static Content about Website -->
-  <section class="bg-white py-12">
+  <header class="relative bg-gray-100 p-24">
     <div class="container mx-auto text-center">
-      <h2 class="text-3xl font-bold text-gray-800">
-        About Our Website
-      </h2>
-      <p class="text-gray-600 mt-4">
-        Our platform is designed to provide a seamless experience for users who want to download videos from popular
-        social media platforms like YouTube, Instagram, and Facebook. We make it simple to save videos for offline
-        viewing and offer additional features like converting images to videos and creating custom videos using scripts.
-      </p>
-
-      <div class="mt-8">
-        <h3 class="text-xl font-semibold text-gray-800">Why Choose Us?</h3>
-        <ul class="text-gray-600 mt-4 list-disc list-inside space-y-2">
-          <li>Fast and easy video downloads.</li>
-          <li>User-friendly interface with minimal steps.</li>
-          <li>Support for a variety of platforms including YouTube, Instagram, and Facebook.</li>
-          <li>Custom video creation from images or scripts.</li>
-        </ul>
+      <h1 class="text-4xl font-extrabold text-gray-800">The Best Way to Showcase Your Project</h1>
+      <p class="text-lg text-gray-600 mt-4">Easily download and process videos from YouTube, Instagram, and Facebook with just a few clicks!</p>
+      <div class="mt-8 flex justify-center space-x-4">
+        <a href="#" class="bg-primary text-white px-6 py-3 rounded-md hover:bg-primary/80 transition">Try for Free</a>
+        <a href="#" class="border border-gray-300 px-6 py-3 rounded-md hover:border-primary transition">See How It Works</a>
       </div>
+    </div>
+   
+  </header>
 
-      <a href="signup"
-        class="mt-8 inline-block px-8 py-4 bg-green-600 text-white rounded-md text-lg hover:bg-green-500 transition duration-300">
-        Join Now
-      </a>
+  <!-- About Section -->
+  <section class="p-16 bg-white">
+    <div class="container mx-auto text-center">
+      <h2 class="text-3xl font-bold text-gray-800">Why Choose Us?</h2>
+      <p class="text-gray-600 mt-4">Join our community and experience the benefits of using our tool for social media video downloads.</p>
     </div>
   </section>
+
+  <!-- Features Section -->
+  <section class="p-16 bg-gray-50">
+    <div class="container mx-auto text-center">
+      <h2 class="text-3xl font-bold text-gray-800">Our Features</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
+        <div class="p-6 bg-white shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">Fast Downloads</h3>
+          <p class="text-gray-600 mt-4">Quickly download videos from your favorite social media platforms.</p>
+        </div>
+        <div class="p-6 bg-white shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">High Quality</h3>
+          <p class="text-gray-600 mt-4">Get the best video quality available, every time.</p>
+        </div>
+        <div class="p-6 bg-white shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">User-Friendly</h3>
+          <p class="text-gray-600 mt-4">An intuitive interface designed for users of all skill levels.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SocialClipSaver Section -->
+  <section class="p-16 bg-white">
+    <div class="container mx-auto text-center">
+      <h2 class="text-3xl font-bold text-gray-800">SocialClipSaver - Download YouTube Videos</h2>
+      <p class="text-gray-600 mt-4">Welcome to SocialClipSaver! SocialClipSaver is the best online video downloading site. SocialClipSaver can do many different things with your online videos collection. SocialClipSaver can allow you to download the entire collection back to your device. It can also help you upload video to Facebook and then put it on Instagram. SocialClipSaver can help you convert special Instagram videos to mp3 and make them your new ringtone. SocialClipSaver can help with all of this and many other things. Here are some of the most well-known:</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-8">
+        <div class="p-6 bg-gray-100 shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">Online mp4 download</h3>
+          <p class="text-gray-600 mt-4">SocialClipSaver is the best online video downloader. We have years of experience and know what an online video downloading tool should look like.</p>
+        </div>
+        <div class="p-6 bg-gray-100 shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">YouTube mp4 download</h3>
+          <p class="text-gray-600 mt-4">SocialClipSaver is an excellent YouTube video downloader. You can download YouTube videos as mp4, MP3, and other formats. HD YouTube downloader available.</p>
+        </div>
+        <div class="p-6 bg-gray-100 shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">Facebook mp4 download</h3>
+          <p class="text-gray-600 mt-4">SocialClipSaver is a great option if you want to save videos from Facebook. SocialClipSaver allows you to quickly and free download your Facebook videos to your device.</p>
+        </div>
+        <div class="p-6 bg-gray-100 shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">YouTube to mp3 convert</h3>
+          <p class="text-gray-600 mt-4">In case there's some awesome track on YouTube, SocialClipSaver can be used to extract the mp3 from YouTube videos and play it offline.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section class="p-16 bg-gray-50">
+    <div class="container mx-auto text-center">
+      <h2 class="text-3xl font-bold text-gray-800">FAQ: Questions & Answers</h2>
+      <p class="text-gray-600 mt-4">There's more questions answered and concerns addressed on the special FAQ Page. These here are quick most asked questions and their quick answers.</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8 text-left">
+        <div class="p-6 bg-white shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">What is the best/fastest way to download videos from YouTube?</h3>
+          <p class="text-gray-600 mt-4">Access the YouTube URL you need to download, copy its URL. Visit SocialClipSaver, paste URL in the input box, press Enter. Select the file format you wish then click to "Download" button.</p>
+        </div>
+        <div class="p-6 bg-white shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">Is there any limit on the amount of downloaded files per user per day?</h3>
+          <p class="text-gray-600 mt-4">No. Our website helps users convert and download any amount of files and all that - for free.</p>
+        </div>
+        <div class="p-6 bg-white shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">What are the video/audio supported formats?</h3>
+          <p class="text-gray-600 mt-4">We offer many conversion options and help you to download MP4, 3GP, MP3 format. You can watch video right after that on your device without installing any other software, given you have a media player, like VLC.</p>
+        </div>
+        <div class="p-6 bg-white shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">What are the compatible devices for the conversion?</h3>
+          <p class="text-gray-600 mt-4">We offer the service that is compatible with all PC devices, smartphones and tablets alike.</p>
+        </div>
+        <div class="p-6 bg-white shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">How to download YouTube video to Android mobile phone?</h3>
+          <p class="text-gray-600 mt-4">Access YouTube with a browser or open YouTube app on your Android device; now, copy the video URL you wish to download. Paste the URL into the search box. You also can enter keyword to look for the video you want. Select the format you'd like to download then tap "Download". After a few seconds, you can download the file.</p>
+        </div>
+        <div class="p-6 bg-white shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">Where do the downloaded files get saved on my device?</h3>
+          <p class="text-gray-600 mt-4">Files you've downloaded are automatically saved in the Downloads folder or the "download history" section on your device, press CTRL+J or go through the menu to access.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials Section -->
+  <section class="p-16 bg-gray-50">
+    <div class="container mx-auto text-center">
+      <h2 class="text-3xl font-bold text-gray-800">What Our Users Say</h2>
+      <p class="text-gray-600 mt-4">People love what we do, and we want you to know why.</p>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
+        <div class="p-6 bg-white shadow rounded-md">
+          <p class="text-gray-600">"Since implementing this tool, our business has seen significant growth."</p>
+          <div class="mt-4">
+            <h3 class="font-bold">Jack Sibire</h3>
+            <p class="text-sm text-gray-500">Lead Manager, Growio</p>
+          </div>
+        </div>
+        <div class="p-6 bg-white shadow rounded-md">
+          <p class="text-gray-600">"I recommend this tool to any business looking for improvement."</p>
+          <div class="mt-4">
+            <h3 class="font-bold">Adele Mouse</h3>
+            <p class="text-sm text-gray-500">Product Manager, Mousio</p>
+          </div>
+        </div>
+        <div class="p-6 bg-white shadow rounded-md">
+          <p class="text-gray-600">"I can't imagine running our company without it."</p>
+          <div class="mt-4">
+            <h3 class="font-bold">Ben Clock</h3>
+            <p class="text-sm text-gray-500">CTO, Clockwork</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- Why Everyone Loves SocialClipSaver Section -->
+  <section class="p-16 bg-white">
+    <div class="container mx-auto text-center">
+      <h2 class="text-3xl font-bold text-gray-800">Why Everyone Loves SocialClipSaver</h2>
+      <p class="text-gray-600 mt-4">SocialClipSaver is your go-to platform for video downloads and audio conversions. No distractions, no hidden fees, just a seamless experience that users love.</p>
+    </div>
+    <div class="container mx-auto mt-8">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+        <div class="p-6 bg-gray-100 shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">SocialClipSaver: YouTube MP4 Downloader</h3>
+          <p class="text-gray-600 mt-4">SocialClipSaver is the best online YouTube video downloader. Download YouTube videos, convert them to MP4, or extract audio from music videos. You can even download entire playlists.</p>
+        </div>
+        <div class="p-6 bg-gray-100 shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">Download YouTube Playlists</h3>
+          <p class="text-gray-600 mt-4">Easily download entire YouTube playlists. Simply copy the playlist URL or use the bookmarklet to get started with the videos you need.</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8 text-left">
+        <div class="p-6 bg-gray-100 shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">YouTube to MP3 Conversion</h3>
+          <p class="text-gray-600 mt-4">Convert any YouTube video to MP3. Whether it's a single video or an entire playlist, SocialClipSaver makes the process fast and easy. You can even include video metadata such as artist names and album art.</p>
+        </div>
+        <div class="p-6 bg-gray-100 shadow rounded-md">
+          <h3 class="text-xl font-bold text-gray-800">Best MP3 Converter for YouTube</h3>
+          <p class="text-gray-600 mt-4">SocialClipSaver offers the best YouTube to MP3 conversion. Download MP3s in high quality (up to 320kbps), with album art, track details, and more.</p>
+        </div>
+      </div>
+    </div>
+    <div class="container mx-auto mt-8">
+      <h3 class="text-2xl font-bold text-gray-800">Why SocialClipSaver Stands Out</h3>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8 text-left">
+        <div class="p-6 bg-gray-100 shadow rounded-md">
+          <h4 class="text-lg font-bold text-gray-800">Convert YouTube Videos to MP3 & MP4</h4>
+          <p class="text-gray-600 mt-4">Easily save YouTube videos to MP3 or MP4, and keep them on your device for offline listening or viewing.</p>
+        </div>
+        <div class="p-6 bg-gray-100 shadow rounded-md">
+          <h4 class="text-lg font-bold text-gray-800">Download Music from Vevo</h4>
+          <p class="text-gray-600 mt-4">Download fresh songs from Vevo and convert them to MP3 or MP4. Ideal for music lovers!</p>
+        </div>
+        <div class="p-6 bg-gray-100 shadow rounded-md">
+          <h4 class="text-lg font-bold text-gray-800">Playlist Downloads with MP3 Metadata</h4>
+          <p class="text-gray-600 mt-4">Download YouTube playlists and save MP3s with complete metadata: artist names, song titles, and album artwork.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+
 
   <!-- Footer -->
-  <footer class="bg-blue-600 text-white py-6">
+  <footer class="bg-gray-800 text-white py-6">
     <div class="container mx-auto text-center">
-      <p>&copy; 2024 Social Media Video Downloader. All rights reserved.</p>
+      <h2 class="text-3xl font-bold">Get Started Today</h2>
+      <p class="text-lg mt-4">Start downloading your favorite social media videos effortlessly.</p>
+      <div class="mt-8 flex justify-center space-x-4">
+        <a href="#" class="bg-white text-primary px-6 py-3 rounded-md hover:bg-gray-200 transition">Sign Up Now</a>
+        <a href="#" class="border border-white px-6 py-3 rounded-md hover:bg-white hover:text-primary transition">Learn More</a>
+      </div>
+    </div>
+    <div class="container mx-auto text-center">
+      <p>&copy; 2024 Lando. All rights reserved.</p>
     </div>
   </footer>
-
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const hamburger = document.getElementById('hamburger');
-      const mobileMenu = document.getElementById('mobile-menu');
-
-      hamburger.addEventListener('click', () => {
-        mobileMenu.classList.toggle('hidden');
-      });
-    });
-  </script>
 </body>
 
 </html>
