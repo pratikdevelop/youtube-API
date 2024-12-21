@@ -121,7 +121,6 @@ def get_video_duration(video_file):
         video_file
     ]
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    print(f"result: {result}")
     return float(result.stdout.strip())
 
 # Function to download a social media video
@@ -131,6 +130,7 @@ def download_social_video(video_url, output_path, cookies_file=None):
     """
     if cookies_file is None:
         cookies_file = os.path.join(UPLOAD_FOLDER, 'cookies.txt') 
+        print(os.path.join(UPLOAD_FOLDER, 'cookies.txt'))
     
     if not os.path.exists(os.path.dirname(output_path)):
         os.makedirs(os.path.dirname(output_path))
@@ -182,6 +182,7 @@ def process_video():
     except ValueError as e:
         return jsonify({'error': 'Invalid segment length.', 'details': str(e)}), 400
 
+    print(os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4().hex}.mp4"))
     video_file = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4().hex}.mp4")
     try:
         # Download the video
