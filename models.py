@@ -28,12 +28,12 @@ def init_db(app, mail_instance):
 
 # Video schema (unchanged)
 class Video:
-    def __init__(self, video_url, segment_length, file_urls):
+    def __init__(self, video_url, segment_length, file_urls, video_type):
         self.video_url = video_url
         self.segment_length = segment_length
         self.file_urls = file_urls  # This will be a JSON list of file URLs
+        self.video_type = video_type  # video_Type of video
         self.created_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
 
     def to_dict(self):
         """Helper method to convert Video object to dictionary"""
@@ -41,11 +41,12 @@ class Video:
             'video_url': self.video_url,
             'segment_length': self.segment_length,
             'file_urls': json.loads(self.file_urls) if isinstance(self.file_urls, str) else self.file_urls,
-            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'video_type': self.video_type
         }
 
-def save_video(video_url, segment_length, file_urls):
-    video = Video(video_url, segment_length, file_urls)
+def save_video(video_url, segment_length, file_urls, video_type):
+    video = Video(video_url, segment_length, file_urls, video_type)
     video_data = video.to_dict()
     try:
         mongo.db.videos.insert_one(video_data)
@@ -62,12 +63,20 @@ def get_all_videos():
     videos = mongo.db.videos.find()
     video_list = []
     for video in videos:
-        video_list.append({
+        video_data = {
             'video_url': video['video_url'],
             'segment_length': video['segment_length'],
             'file_urls': video['file_urls'],
-            'created_at': video['created_at']
-        })
+            'created_at': video['created_at'],
+        }
+        
+        # Add 'video_type' to the dictionary if it exists
+        if video.get('video_type'):
+            video_data['video_type'] = video['video_type']
+        
+        # Append the video data to the list
+        video_list.append(video_data)
+    
     return video_list
 
 
