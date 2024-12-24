@@ -20,7 +20,8 @@ from PIL import Image
 from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip
 from flask_mail import Mail, Message
 from flask_jwt_extended import JWTManager
-from models import mongo, init_db, save_video, get_all_videos  # Import database functions
+from models import mongo, init_db, save_video, get_all_videos, get_video_by_id, delete_videos
+import ffmpeg
 
 # Load environment variables
 load_dotenv()
@@ -148,7 +149,6 @@ def download_social_video(video_url, output_path,format_option='mp4'):
         raise
 
 
-
 # Function to upload video to AWS S3
 def upload_to_s3(file_path, file_name):
     try:
@@ -166,61 +166,141 @@ def upload_to_s3(file_path, file_name):
     except Exception as e:
         logging.error(f"Unexpected error occurred: {e}")
 
-# Endpoint to process a video
-@app.route('/process-video', methods=['POST'])
+@app.route("/process-video", methods=["POST"])
 def process_video():
     data = request.json
-    video_url = data.get('url')
-    segment_length = data.get('segment_length', 60)  # Default to 60 seconds if not provided
-    
+    video_url = data.get("url")
+    segment_length = data.get(
+        "segment_length", 60
+    )  # Default to 60 seconds if not provided
+
     if not video_url:
-        return jsonify({'error': 'Missing video URL.'}), 400
-    
+        return jsonify({"error": "Missing video URL."}), 400
+
     try:
         segment_length = int(segment_length)
         if segment_length <= 0:
             raise ValueError("Segment length must be positive.")
     except ValueError as e:
-        return jsonify({'error': 'Invalid segment length.', 'details': str(e)}), 400
+        return jsonify({"error": "Invalid segment length.", "details": str(e)}), 400
 
-    video_file = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4().hex}.mp4.webm")
+    # Set the initial file paths
+    video_file = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4().hex}.webm")
+    mp4_file = os.path.join(
+        UPLOAD_FOLDER, f"{uuid.uuid4().hex}.mp4"
+    )  # Converted MP4 file
 
     try:
-        # Download the video
-        download_social_video(video_url, video_file, 'bv+ba/b')
+        # Download the WebM video
+        download_social_video(video_url, video_file, "bv+ba/b")
 
-        # Get video duration
-        video_duration = get_video_duration(video_file)
+        # Convert WebM to MP4
+        convert_webm_to_mp4(video_file, mp4_file)
+
+        # Get the duration of the converted MP4 video
+        video_duration = get_video_duration(mp4_file)
         segment_urls = []
 
         # Split and upload video segments
         for start_time in range(0, int(video_duration), segment_length):
             end_time = min(start_time + segment_length, int(video_duration))
-            segment_file = f"{UPLOAD_FOLDER}/{uuid.uuid4().hex}_segment.webm"
-            subprocess.run([
-                'ffmpeg', 
-                '-i', video_file,          # Input WebM file
-                '-ss', str(start_time),     # Start time for the segment
-                '-to', str(end_time),       # End time for the segment
-                '-c', 'copy',               # Copy streams (no re-encoding)
-                segment_file                # Output WebM segment
-            ], check=True)
-                
+            segment_file = f"{UPLOAD_FOLDER}/{uuid.uuid4().hex}_segment.mp4"
+
+            # Create the video segment (MP4 format)
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-i",
+                    mp4_file,  # Input MP4 file
+                    "-ss",
+                    str(start_time),  # Start time for the segment
+                    "-to",
+                    str(end_time),  # End time for the segment
+                    "-c:v",
+                    "libx264",  # Video codec
+                    "-c:a",
+                    "aac",  # Audio codec
+                    "-strict",
+                    "experimental",  # Ensure AAC compatibility
+                    segment_file,  # Output MP4 segment
+                ],
+                check=True,
+            )
+
+            # Upload the segment to S3
             s3_url = upload_to_s3(segment_file, os.path.basename(segment_file))
             if s3_url:
                 segment_urls.append(s3_url)
 
-            os.remove(segment_file)  # Clean up segment file
-        
+            # Clean up the segment file after upload
+            os.remove(segment_file)
+
+        # Remove the downloaded and converted MP4 video files
+        os.remove(mp4_file)
         os.remove(video_file)
 
-        # Save to database
-        save_video(video_url, segment_length, segment_urls, 'youtube')
+        # Save video segment information to the database
+        save_video(video_url, segment_length, segment_urls, "youtube")
 
-        return jsonify({'videoSegments': segment_urls})
+        return jsonify({"videoSegments": segment_urls})
+
     except Exception as e:
         logging.error(f"Error processing video: {e}")
-        return jsonify({'error': 'Failed to process video', 'details': str(e)}), 500
+        return jsonify({"error": "Failed to process video", "details": str(e)}), 500
+
+'''def convert_webm_to_mp4(input_file, output_file):
+    try:
+        # Convert WebM to MP4 using FFmpeg
+        ffmpeg.input(input_file).output(
+            output_file,
+            vcodec="libx264",
+            acodec="aac",
+            vprofile="baseline",
+            
+        ).run()
+        print(f"Conversion successful: {input_file} -> {output_file}")
+    except ffmpeg.Error as e:
+        raise Exception(f"Error during WebM to MP4 conversion: {e}") 
+replace ffmpeg  code with this 
+
+ name, ext = os.path.splitext(mkv)
+    if ext != ".mkv":
+        raise Exception("Please add MKV files only!")
+
+    output_name = name + ".mp4"
+    try:
+        subprocess.run(
+            ["ffmpeg", "-i", f"assets/{mkv}", "-codec", "copy", f"result/{output_name}"], check=True
+        )
+    except:
+        raise Exception(
+            "Please DOWNLOAD, INSTALL & ADD the path of FFMPEG to Environment Variables!"
+        )'''
+
+
+def convert_webm_to_mp4(input_file, output_file):
+    name, ext = os.path.splitext(input_file)
+    if ext != ".webm":
+        raise Exception("Please add WEBM files only!")
+
+    try:
+        # Run FFmpeg using subprocess to convert the WebM file to MP4
+        subprocess.run( [ "ffmpeg","-i", input_file,
+                "-codec",
+                "copy",
+                "-c:v", "libx264", "-c:a", "aac", "-strict", "-2",
+                output_file,
+            ],
+            check=True,
+        )
+        print(f"Conversion successful: {input_file} -> {output_file}")
+    except subprocess.CalledProcessError as e:
+        raise Exception(f"Error during WebM to MP4 conversion: {e}")
+    except FileNotFoundError:
+        raise Exception(
+            "Please DOWNLOAD, INSTALL & ADD the path of FFMPEG to Environment Variables!"
+        )
+
 
 @app.route('/download-instagram', methods=['POST'])
 def download_instagram():
@@ -255,219 +335,7 @@ def download_instagram():
         logging.error(f"Error downloading Instagram post: {e}")
         return jsonify({'error': 'Failed to download Instagram post', 'details': str(e)}), 500
 
-# @app.route('/download-facebook', methods=['POST'])
-# def download_facebook():
-    data = request.json
-    url = data.get('url')
 
-    if not url:
-        return jsonify({'error': 'Missing Facebook video URL.'}), 400
-
-    try:
-        # Check if the URL is a valid Facebook link
-        if "www.facebook.com" not in url:
-            try:
-                url = requests.head(url, allow_redirects=True).headers.get('location', url)
-            except requests.RequestException as e:
-                return jsonify({'error': 'Invalid Facebook video URL.', 'details': str(e)}), 400
-
-        # Fetch the page HTML
-        response = requests.get(url)
-        if response.status_code != 200:
-            return jsonify({'error': 'Failed to fetch Facebook page content.'}), 500
-
-        html = response.content.decode('utf-8')
-
-        # Find video sources
-        hd_match = re.search(r'hd_src:"(https[^"]+)"', html)
-        sd_match = re.search(r'sd_src:"(https[^"]+)"', html)
-
-        # if not hd_match and not sd_match:
-        #     return jsonify({'error': 'No video source found on the Facebook page.'}), 404
-
-        # Prioritize HD video, fallback to SD
-        video_url = hd_match.group(1) if hd_match else sd_match.group(1)
-
-        # Download video
-        file_size_request = requests.get(video_url, stream=True)
-        block_size = 1024
-        filename = datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + '.mp4'
-        file_path = os.path.join(UPLOAD_FOLDER, filename)
-
-        with open(file_path, 'wb') as f:
-            for data in file_size_request.iter_content(block_size):
-                f.write(data)
-
-        # Upload to S3 (Assuming `upload_to_s3` function is defined elsewhere)
-        s3_url = upload_to_s3(file_path, os.path.basename(file_path))
-
-        # Save to MongoDB (Assuming `save_video` function is defined elsewhere)
-        video_data = save_video(url, None, [s3_url])
-
-        # Clean up local file
-        if os.path.exists(file_path):
-            os.remove(file_path)
-
-        return jsonify({
-            'videoUrl': s3_url,
-            'message': 'Facebook video has been successfully downloaded and stored in MongoDB.',
-        })
-
-    except Exception as e:
-        logging.error(f"Error downloading Facebook video: {e}")
-        return jsonify({'error': 'Unexpected error occurred', 'details': str(e)}), 500
-
-# from bs4 import BeautifulSoup
-
-# @app.route('/download-facebook', methods=['POST'])
-# def download_facebook():
-#     data = request.json
-#     url = data.get('url')
-
-#     if not url:
-#         return jsonify({'error': 'Missing Facebook video URL.'}), 400
-
-#     try:
-#         # Check if the URL is a valid Facebook link
-#         if "www.facebook.com" not in url:
-#             try:
-#                 url = requests.head(url, allow_redirects=True).headers.get('location', url)
-#             except requests.RequestException as e:
-#                 return jsonify({'error': 'Invalid Facebook video URL.', 'details': str(e)}), 400
-
-#         # Fetch the page HTML
-#         response = requests.get(url)
-#         if response.status_code != 200:
-#             return jsonify({'error': 'Failed to fetch Facebook page content.'}), 500
-
-#         html_content = response.content
-#         soup = BeautifulSoup(html_content, 'html.parser')
-
-#         # Look for video URLs in the script tags
-#         scripts = soup.find_all('script')
-#         video_url = None
-
-#         for script in scripts:
-#             if 'hd_src' in script.text or 'sd_src' in script.text:
-#                 script_content = script.text
-#                 # Extract hd_src or sd_src
-#                 start_index = script_content.find('hd_src') + len('hd_src":"')
-#                 end_index = script_content.find('"', start_index)
-#                 video_url = script_content[start_index:end_index]
-
-#                 if not video_url:  # If HD is not found, check SD
-#                     start_index = script_content.find('sd_src') + len('sd_src":"')
-#                     end_index = script_content.find('"', start_index)
-#                     video_url = script_content[start_index:end_index]
-
-#                 break  # Exit loop once a video URL is found
-
-#         if not video_url:
-#             return jsonify({'error': 'No video source found on the Facebook page.'}), 404
-
-#         # Download the video
-#         file_size_request = requests.get(video_url, stream=True)
-#         block_size = 1024
-#         filename = datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + '.mp4'
-#         file_path = os.path.join(UPLOAD_FOLDER, filename)
-
-#         with open(file_path, 'wb') as f:
-#             for data in file_size_request.iter_content(block_size):
-#                 f.write(data)
-
-#         # Upload to S3 (Assuming `upload_to_s3` is defined)
-#         s3_url = upload_to_s3(file_path, os.path.basename(file_path))
-
-#         # Save to MongoDB (Assuming `save_video` is defined)
-#         video_data = save_video(url, None, [s3_url])
-
-#         # Clean up local file
-#         if os.path.exists(file_path):
-#             os.remove(file_path)
-
-#         return jsonify({
-#             'videoUrl': s3_url,
-#             'message': 'Facebook video has been successfully downloaded and stored in MongoDB.',
-#         })
-
-#     except Exception as e:
-#         logging.error(f"Error downloading Facebook video: {e}")
-#         return jsonify({'error': 'Unexpected error occurred', 'details': str(e)}), 500
-
-# from selenium import webdriver
-# from selenium.webdriver.chrome.service import Service
-# from selenium.webdriver.common.by import By
-# from selenium.webdriver.chrome.options import Options
-# import time
-
-# @app.route('/download-facebook', methods=['POST'])
-# def download_facebook():
-#     data = request.json
-#     url = data.get('url')
-
-#     if not url:
-#         return jsonify({'error': 'Missing Facebook video URL.'}), 400
-
-#     try:
-#         # Set up Selenium WebDriver
-#         chrome_options = Options()
-#         chrome_options.add_argument('--headless')
-#         chrome_options.add_argument('--no-sandbox')
-#         chrome_options.add_argument('--disable-dev-shm-usage')
-
-#         service = Service('/path/to/chromedriver')  # Update path to chromedriver
-#         driver = webdriver.Chrome(service=service, options=chrome_options)
-
-#         # Open the Facebook URL
-#         driver.get(url)
-#         time.sleep(5)  # Allow time for the page to load fully
-
-#         # Extract page source
-#         html = driver.page_source
-#         driver.quit()
-
-#         # Parse HTML to find video source
-#         if 'hd_src' in html or 'sd_src' in html:
-#             video_url = None
-#             if 'hd_src' in html:
-#                 video_url = html.split('hd_src":"')[1].split('"')[0].replace('\\u0025', '%')
-#             elif 'sd_src' in html:
-#                 video_url = html.split('sd_src":"')[1].split('"')[0].replace('\\u0025', '%')
-
-#             if not video_url:
-#                 return jsonify({'error': 'No video source found on the Facebook page.'}), 404
-
-#             # Download video
-#             file_size_request = requests.get(video_url, stream=True)
-#             block_size = 1024
-#             filename = datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + '.mp4'
-#             file_path = os.path.join(UPLOAD_FOLDER, filename)
-
-#             with open(file_path, 'wb') as f:
-#                 for data in file_size_request.iter_content(block_size):
-#                     f.write(data)
-
-#             # Upload to S3 (Assuming `upload_to_s3` is defined)
-#             s3_url = upload_to_s3(file_path, os.path.basename(file_path))
-
-#             # Save to MongoDB (Assuming `save_video` is defined)
-#             video_data = save_video(url, None, [s3_url])
-
-#             # Clean up local file
-#             if os.path.exists(file_path):
-#                 os.remove(file_path)
-
-#             return jsonify({
-#                 'videoUrl': s3_url,
-#                 'message': 'Facebook video has been successfully downloaded and stored in MongoDB.',
-#             })
-
-#         else:
-#             return jsonify({'error': 'No video source found on the Facebook page.'}), 404
-
-#     except Exception as e:
-#         logging.error(f"Error downloading Facebook video: {e}")
-#         return jsonify({'error': 'Unexpected error occurred', 'details': str(e)}), 500
 @app.route('/download-facebook', methods=['POST'])
 def download_facebook():
     data = request.json
@@ -679,13 +547,67 @@ def generate_video(image_paths):
     # Upload to S3
     s3_url = upload_to_s3(video_path, video_file)
     file_urls = [s3_url]  # Single URL in this case
-    
+
     segment_length = None  # Instagram videos are not segmented by default
     video_data = save_video(output_video, segment_length, file_urls)
 
     print(f"Video uploaded to S3 and saved in the database: {video_data}")
 
     return output_video
+
+
+@app.route("/delete-video/<video_id>", methods=["DELETE"])
+def delete_video(video_id):
+    if not video_id:
+        return jsonify({"error": "Missing video ID."}), 400
+
+    try:
+        # Fetch video from the database by ID
+        video = get_video_by_id(video_id)        
+
+        if not video:
+            return jsonify({"error": "Video not found."}), 404
+
+        # If video is found, delete associated file from S3 (or your file storage)
+        file_urls = video.get("file_urls", [])
+
+        if file_urls:
+            for file_url in file_urls:
+                # Assuming you have a function to delete from S3
+                if delete_from_s3(file_url):
+                    print(f"Deleted file from S3: {file_url}")
+                else:
+                    logging.error(f"Failed to delete file from S3: {file_url}")
+
+        # Now delete video record from MongoDB
+        result = delete_videos(video_id)
+
+        if result == True:
+            return jsonify({"message": "Video deleted successfully."}), 200
+        else:
+            return jsonify({"error": "Failed to delete video from the database."}), 500
+
+    except Exception as e:
+        print(f"Error during video deletion: {e}")
+        return jsonify({"error": "An error occurred while deleting the video."}), 500
+def delete_from_s3(file_url):
+    # If you're using AWS S3, this function deletes a file by URL (or file path) from S3
+    try:
+       
+        file_name = file_url.split("/")[
+            -1
+        ]  # Assuming the file name is the last part of the URL
+
+        response = s3_client.delete_object(Bucket=AWS_S3_BUCKET, Key=file_name)
+
+        # Check the response
+        if response["ResponseMetadata"]["HTTPStatusCode"] == 204:
+            return True
+        else:
+            return False
+    except Exception as e:
+        logging.error(f"Failed to delete file from S3: {e}")
+        return False
 
 
 if __name__ == '__main__':

@@ -1,3 +1,4 @@
+from flask_mail import Message
 from flask_pymongo import PyMongo
 from datetime import datetime
 import json
@@ -7,6 +8,8 @@ from flask import jsonify, request
 import secrets  # For generating the reset token
 from itsdangerous import URLSafeTimedSerializer as Serializer  # For secure token generation
 from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity
+from bson import ObjectId
+
 
 # Initialize PyMongo (MongoDB client)
 mongo = None
@@ -56,28 +59,59 @@ def save_video(video_url, segment_length, file_urls, video_type):
         logging.error(f"Error inserting video: {str(e)}")
         logging.error(f"Error inserting user: {str(e)}")
         return None
-    
     return video_data
+
+
+def delete_videos(video_id): 
+    try:
+        mongo.db.videos.delete_one({"_id": ObjectId(video_id)})
+        return True
+    except Exception as e:
+        print(f"Error video deletion: {e}")
+        return False
+
 
 def get_all_videos():
     videos = mongo.db.videos.find()
     video_list = []
     for video in videos:
+        video_url = video.get('video_url')
+        file_urls = video.get('file_urls', [])
+
+        # If `video_url` is None or empty, skip this record or set a placeholder
+        if not video_url:
+            video_url = 'N/A'  # Placeholder value or skip record
+
+        # If `file_urls` is empty or contains None, we can handle that gracefully
+        if not file_urls or file_urls == [None]:
+            file_urls = ['No files available']  # Placeholder for missing files
+
+        # Prepare video data with a fallback for missing values
         video_data = {
-            'video_url': video['video_url'],
-            'segment_length': video['segment_length'],
-            'file_urls': video['file_urls'],
-            'created_at': video['created_at'],
+            "id": str(video["_id"]),
+            "video_url": video_url,
+            "segment_length": video.get("segment_length", "Not specified"),
+            "file_urls": file_urls,
+            "created_at": video.get("created_at", "Unknown time"),
         }
-        
-        # Add 'video_type' to the dictionary if it exists
+
+        # Optionally, include `video_type` if it exists
         if video.get('video_type'):
             video_data['video_type'] = video['video_type']
-        
+
         # Append the video data to the list
         video_list.append(video_data)
-    
+
     return video_list
+
+
+def get_video_by_id(id):
+    video = mongo.db.videos.find_one({"_id": ObjectId(id)})
+    if video:
+        return video
+    else:
+        return None
+    # End of video functions
 
 
 # User schema (modified to work with MongoDB)
