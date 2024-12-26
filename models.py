@@ -71,8 +71,10 @@ def delete_videos(video_id):
         return False
 
 
-def get_all_videos():
-    videos = mongo.db.videos.find()
+def get_all_videos(type):
+    videos = mongo.db.videos.find({
+        "video_type": type
+    })
     video_list = []
     for video in videos:
         video_url = video.get('video_url')

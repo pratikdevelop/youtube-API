@@ -315,7 +315,7 @@ def download_instagram():
         
         instaloader_instance = instaloader.Instaloader()
         shortcode = post_url.split('/')[-2]
-        instaloader.Post.from_shortcode(instaloader_instance.context, shortcode)
+        instaloader.Post.from_shortcode(instaloader_instance.context, shortcode).date_utc()
 
         # Find and upload the video
         video_file = next(
@@ -370,7 +370,7 @@ def download_facebook():
             s3_url = upload_to_s3(video_file, os.path.basename(video_file))
 
             # Assuming save_video function is defined elsewhere to save video data to MongoDB
-            video_data = save_video(url, None, [s3_url])
+            video_data = save_video(url, None, [s3_url] , 'facebook')
 
             # Clean up local video file after upload
             if os.path.exists(video_file):
@@ -393,7 +393,12 @@ def download_facebook():
 # Endpoint: List videos
 @app.route('/list-videos', methods=['GET'])
 def list_videos():
-    videos = get_all_videos()
+    # Assuming get_videos function is defined elsewhere to retrieve video data from MongoDB
+    # get Query params vairable fromthis  query list-videos?type=youtube
+    query_type = request.args.get('type')
+    print(f'query Type: {query_type }')
+
+    videos = get_all_videos(type=query_type)
     return jsonify(videos)
 
 # Endpoint: Generate S3 pre-signed URL
