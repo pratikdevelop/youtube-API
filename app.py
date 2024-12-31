@@ -17,11 +17,14 @@ from botocore.config import Config
 import instaloader
 from werkzeug.utils import secure_filename
 from PIL import Image
-from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip
+from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip, ColorClip
 from flask_mail import Mail, Message
 from flask_jwt_extended import JWTManager
 from models import mongo, init_db, save_video, get_all_videos, get_video_by_id, delete_videos
 import ffmpeg
+from werkzeug.utils import secure_filename
+from gtts import gTTS  # Google Text-to-Speech
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -98,7 +101,7 @@ def facebook():
 
 @app.route("/image-to-video")
 def image_to_video():
-    return render_template("image-to-video.html")  # Image to Video page
+    return render_template("image_to_video.html")  # Image to Video page
 
 
 @app.route("/video-generated")
@@ -127,7 +130,7 @@ def download_social_video(video_url, output_path,format_option='mp4'):
     # Set up the basic yt-dlp command with the default format option
     command = ['yt-dlp', '--output', output_path]
     command.extend(['--format', 'bv+ba/b'])
-    command.extend(['--cookies', 'cookies.txt'])
+    # command.extend(['--cookies', 'cookies.txt'])
     command.append(video_url)
 
     try:
@@ -248,36 +251,6 @@ def process_video():
         logging.error(f"Error processing video: {e}")
         return jsonify({"error": "Failed to process video", "details": str(e)}), 500
 
-'''def convert_webm_to_mp4(input_file, output_file):
-    try:
-        # Convert WebM to MP4 using FFmpeg
-        ffmpeg.input(input_file).output(
-            output_file,
-            vcodec="libx264",
-            acodec="aac",
-            vprofile="baseline",
-            
-        ).run()
-        print(f"Conversion successful: {input_file} -> {output_file}")
-    except ffmpeg.Error as e:
-        raise Exception(f"Error during WebM to MP4 conversion: {e}") 
-replace ffmpeg  code with this 
-
- name, ext = os.path.splitext(mkv)
-    if ext != ".mkv":
-        raise Exception("Please add MKV files only!")
-
-    output_name = name + ".mp4"
-    try:
-        subprocess.run(
-            ["ffmpeg", "-i", f"assets/{mkv}", "-codec", "copy", f"result/{output_name}"], check=True
-        )
-    except:
-        raise Exception(
-            "Please DOWNLOAD, INSTALL & ADD the path of FFMPEG to Environment Variables!"
-        )'''
-
-
 def convert_webm_to_mp4(input_file, output_file):
     name, ext = os.path.splitext(input_file)
     if ext != ".webm":
@@ -326,7 +299,7 @@ def download_instagram():
             s3_url = upload_to_s3(video_path, video_file)
             file_urls = [s3_url]  # Single URL in this case
             segment_length = None  # Instagram videos are not segmented by default
-            video_data = save_video(post_url, segment_length, file_urls)                
+            video_data = save_video(post_url, segment_length, file_urls, 'instagram')                
             os.remove(video_path)
             return jsonify({'videoUrl': s3_url})
         else:
@@ -554,11 +527,180 @@ def generate_video(image_paths):
     file_urls = [s3_url]  # Single URL in this case
 
     segment_length = None  # Instagram videos are not segmented by default
-    video_data = save_video(output_video, segment_length, file_urls)
+    video_data = save_video(output_video, segment_length, file_urls, 'imageToVideo')
 
     print(f"Video uploaded to S3 and saved in the database: {video_data}")
 
     return output_video
+
+
+# @app.route("/generate-video", methods=["POST"])
+# def generate_video_from_script():
+#     script = request.form['script']
+#     title = request.form['videoTitle']
+#     aspect_ratio = request.form['aspectRatio']
+
+
+#     # Process video and generate final output based on selected aspect ratio
+#     video_output_path = os.path.join(UPLOAD_FOLDER, f"{title}.mp4")
+#     process_video_script(media_paths[0], aspect_ratio, video_output_path)
+
+#     # Upload to AWS S3 and save video metadata in MongoDB
+#     s3_url = upload_to_s3(video_output_path, video_output_path)
+#     file_urls = [s3_url]  # Only one URL in this case
+
+#     # Save video metadata in MongoDB
+#     segment_length = None  # Assuming no segmentation needed for Instagram videos
+#     video_data = save_video(title, segment_length, file_urls,'scripted_video')
+
+# def process_video_script(input_video_path, aspect_ratio, output_video_path):
+#     """Process the video based on aspect ratio using FFmpeg."""
+#     if aspect_ratio == "16:9":
+#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1920:1080', output_video_path]
+#     elif aspect_ratio == "4:3":
+#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1440:1080', output_video_path]
+#     elif aspect_ratio == "1:1":
+#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1080:1080', output_video_path]
+#     elif aspect_ratio == "9:16":
+#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1080:1920', output_video_path]
+#     elif aspect_ratio == "21:9":
+#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=2560:1080', output_video_path]
+    
+#     subprocess.run(ffmpeg_command)
+
+# import os
+# import subprocess
+# from flask import Flask, request, jsonify
+# from werkzeug.utils import secure_filename
+# import boto3
+# from pymongo import MongoClient
+# from datetime import datetime
+
+# app = Flask(__name__)
+
+# # Configure directories, AWS S3, MongoDB, etc.
+# UPLOAD_FOLDER = './uploads'  # Local upload directory (adjust if needed)
+# ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
+# app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+# client = MongoClient("mongodb://localhost:27017/")  # MongoDB connection (update with your URI)
+# db = client['video_database']
+# videos_collection = db['videos']
+
+# # AWS S3 Configuration (example)
+# s3_client = boto3.client('s3')
+# S3_BUCKET = 'your-s3-bucket-name'
+
+# # Helper function to check file extension
+# def allowed_file(filename):
+#     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# # Route for video generation from script (without media)
+# @app.route("/generate-video", methods=["POST"])
+# def generate_video_from_script():
+#     script = request.form['script']
+#     title = request.form['videoTitle']
+#     aspect_ratio = request.form['aspectRatio']
+
+#     # Set a default input video or any existing media you want to use (e.g., placeholder)
+#     # Assuming you have a default placeholder video you want to use for all scripts.
+#     input_video_path = os.path.join(UPLOAD_FOLDER, 'placeholder.mp4')  # Set path to the input video
+#     if not os.path.exists(input_video_path):
+#         return jsonify({'error': 'Placeholder video not found'}), 400
+
+#     # Generate video based on the script and aspect ratio
+#     video_output_path = os.path.join(UPLOAD_FOLDER, f"{title}.mp4")
+#     process_video_script(input_video_path, aspect_ratio, video_output_path)
+
+#     # Upload to AWS S3 and save metadata
+#     s3_url = upload_to_s3(video_output_path, title)
+#     file_urls = [s3_url]  # Assuming we are dealing with a single video URL
+
+#     # Save video metadata in MongoDB
+#     segment_length = None  # Assuming no segmentation needed for Instagram videos
+#     video_data = save_video(title, segment_length, file_urls, 'scripted_video')
+
+#     # Return success response with metadata
+#     return jsonify({
+#         'message': 'Video generated successfully!',
+#         'video_url': s3_url,
+#         'title': title,
+#         'script': script
+#     })
+
+# def process_video_script(input_video_path, aspect_ratio, output_video_path):
+#     """Process the video based on aspect ratio using FFmpeg."""
+#     if aspect_ratio == "16:9":
+#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1920:1080', output_video_path]
+#     elif aspect_ratio == "4:3":
+#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1440:1080', output_video_path]
+#     elif aspect_ratio == "1:1":
+#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1080:1080', output_video_path]
+#     elif aspect_ratio == "9:16":
+#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1080:1920', output_video_path]
+#     elif aspect_ratio == "21:9":
+#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=2560:1080', output_video_path]
+    
+#     subprocess.run(ffmpeg_command)
+
+
+@app.route("/generate-video", methods=["POST"])
+def generate_video_from_script():
+    script = request.form['script']
+    title = request.form['videoTitle']
+    aspect_ratio = request.form['aspectRatio']
+
+    # Step 1: Convert script to speech (audio)
+    audio_path = os.path.join(UPLOAD_FOLDER, f"{title}.mp3")
+    tts = gTTS(script)
+    tts.save(audio_path)
+
+    # Step 2: Create a simple video using MoviePy
+    video_output_path = os.path.join(UPLOAD_FOLDER, f"{title}.mp4")
+    create_video_from_audio(audio_path, video_output_path, aspect_ratio)
+
+    # Step 3: Upload to AWS S3 and save metadata
+    s3_url = upload_to_s3(video_output_path, title)
+    file_urls = [s3_url]
+
+    # Save video metadata in MongoDB
+    segment_length = None  # Assuming no segmentation needed
+    video_data = save_video(title, segment_length, file_urls, 'scripted_video')
+
+    # Return success response
+    return jsonify({
+        'message': 'Video generated successfully!',
+        'video_url': s3_url,
+        'title': title,
+        'script': script
+    })
+
+def create_video_from_audio(audio_path, output_video_path, aspect_ratio):
+    """Creates a video from the audio using MoviePy, and applies the aspect ratio."""
+    # Step 1: Create a background image (placeholder)
+    # For simplicity, let's use a solid color as the background (you could replace this with your own image).
+    background = ColorClip(size=(1920, 1080), color=(255, 255, 255), duration=10)  # white background
+    background = background.with_fps(24)
+
+    # Step 2: Load the audio
+    audio = AudioFileClip(audio_path)
+
+    # Step 3: Combine background with audio
+    video = background.with_audio(audio)
+
+    # Step 4: Resize video to match aspect ratio
+    # if aspect_ratio == "16:9":
+    #     video = video.resize(newsize=(1920, 1080))
+    # elif aspect_ratio == "4:3":
+    #     video = video.resize(newsize=(1440, 1080))
+    # elif aspect_ratio == "1:1":
+    #     video = video.resize(newsize=(1080, 1080))
+    # elif aspect_ratio == "9:16":
+    #     video = video.resize(newsize=(1080, 1920))
+    # elif aspect_ratio == "21:9":
+    #     video = video.resize(newsize=(2560, 1080))
+
+    # Step 5: Write the video file
+    video.write_videofile(output_video_path, codec='libx264', audio_codec='aac')
 
 
 @app.route("/delete-video/<video_id>", methods=["DELETE"])
@@ -595,6 +737,7 @@ def delete_video(video_id):
     except Exception as e:
         print(f"Error during video deletion: {e}")
         return jsonify({"error": "An error occurred while deleting the video."}), 500
+
 def delete_from_s3(file_url):
     # If you're using AWS S3, this function deletes a file by URL (or file path) from S3
     try:
