@@ -70,41 +70,48 @@ def delete_videos(video_id):
         print(f"Error video deletion: {e}")
         return False
 
+def get_all_videos(video_type):
+    """
+    Fetch all videos of a specified type from the database.
 
-def get_all_videos(type):
-    videos = mongo.db.videos.find({
-        "video_type": type
-    })
-    video_list = []
-    for video in videos:
-        video_url = video.get('video_url')
-        file_urls = video.get('file_urls', [])
+    Args:
+        video_type (str): The type of videos to fetch.
 
-        # If `video_url` is None or empty, skip this record or set a placeholder
-        if not video_url:
-            video_url = 'N/A'  # Placeholder value or skip record
+    Returns:
+        list: A list of dictionaries containing video data.
+    """
+    try:
+        # Query the database for videos of the specified type
+        print(type(mongo))
 
-        # If `file_urls` is empty or contains None, we can handle that gracefully
-        if not file_urls or file_urls == [None]:
-            file_urls = ['No files available']  # Placeholder for missing files
+        videosList = mongo.db.videos.find({"video_type": video_type})
+        
+        video_list = []
+        
+        for video in videosList:
+            # Extract video data with fallbacks for missing fields
+            video_url = video.get('video_url', 'N/A')
+            file_urls = video.get('file_urls', ['No files available'])
+            
+            # Prepare video data dictionary
+            video_data = {
+                "id": str(video.get("_id", "Unknown ID")),
+                "video_url": video_url,
+                "segment_length": video.get("segment_length", "Not specified"),
+                "file_urls": file_urls,
+                "created_at": video.get("created_at", "Unknown time"),
+                "video_type": video.get('video_type', "Not specified")
+            }
+            
+            video_list.append(video_data)
+        print(
+            f"Fetched {len(video_list)} videos of type {video_type} from the database.")
+        return video_list
 
-        # Prepare video data with a fallback for missing values
-        video_data = {
-            "id": str(video["_id"]),
-            "video_url": video_url,
-            "segment_length": video.get("segment_length", "Not specified"),
-            "file_urls": file_urls,
-            "created_at": video.get("created_at", "Unknown time"),
-        }
+    except Exception as e:
+        print(f"Error fetching videos: {e}")
+        return []
 
-        # Optionally, include `video_type` if it exists
-        if video.get('video_type'):
-            video_data['video_type'] = video['video_type']
-
-        # Append the video data to the list
-        video_list.append(video_data)
-
-    return video_list
 
 
 def get_video_by_id(id):

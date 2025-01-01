@@ -1,3 +1,4 @@
+from instascrape import Reel
 from io import BytesIO
 import random
 import string
@@ -24,7 +25,7 @@ from models import mongo, init_db, save_video, get_all_videos, get_video_by_id, 
 import ffmpeg
 from werkzeug.utils import secure_filename
 from gtts import gTTS  # Google Text-to-Speech
-from datetime import datetime
+import datetime
 
 # Load environment variables
 load_dotenv()
@@ -280,17 +281,18 @@ def download_instagram():
     data = request.json
     post_url = data.get('url')
 
+
     if not post_url:
         return jsonify({'error': 'Missing Instagram post URL.'}), 400
 
     try:
         # Download Instagram post
-        
         instaloader_instance = instaloader.Instaloader()
         shortcode = post_url.split('/')[-2]
-        instaloader.Post.from_shortcode(instaloader_instance.context, shortcode).date_utc()
 
-        # Find and upload the video
+        # Fetch the post object
+        post = instaloader.Post.from_shortcode(instaloader_instance.context, shortcode)
+        instaloader_instance.download_post(post=post, target=UPLOAD_FOLDER)
         video_file = next(
             (file for file in os.listdir(UPLOAD_FOLDER) if file.endswith('.mp4')), None)
 
@@ -299,7 +301,7 @@ def download_instagram():
             s3_url = upload_to_s3(video_path, video_file)
             file_urls = [s3_url]  # Single URL in this case
             segment_length = None  # Instagram videos are not segmented by default
-            video_data = save_video(post_url, segment_length, file_urls, 'instagram')                
+            save_video(post_url, segment_length, file_urls, 'instagram')
             os.remove(video_path)
             return jsonify({'videoUrl': s3_url})
         else:
@@ -333,13 +335,7 @@ def download_facebook():
             video_title = info_dict.get('title', 'facebook_video')  # Get title of the video
             video_ext = info_dict.get('ext', 'mp4')  # Get file extension (e.g., mp4)
             video_file = os.path.join(UPLOAD_FOLDER, f"{custom_name}.{video_ext}")
-            
             print('Video file:', video_file)
-
-            # Check if the video file was downloaded
-            
-
-            # Optional: Implement your S3 upload logic here
             s3_url = upload_to_s3(video_file, os.path.basename(video_file))
 
             # Assuming save_video function is defined elsewhere to save video data to MongoDB
@@ -371,7 +367,7 @@ def list_videos():
     query_type = request.args.get('type')
     print(f'query Type: {query_type }')
 
-    videos = get_all_videos(type=query_type)
+    videos = get_all_videos(query_type)
     return jsonify(videos)
 
 # Endpoint: Generate S3 pre-signed URL
@@ -574,7 +570,6 @@ def generate_video(image_paths):
 # from werkzeug.utils import secure_filename
 # import boto3
 # from pymongo import MongoClient
-# from datetime import datetime
 
 # app = Flask(__name__)
 
@@ -710,7 +705,7 @@ def delete_video(video_id):
 
     try:
         # Fetch video from the database by ID
-        video = get_video_by_id(video_id)        
+        video = get_video_by_id(video_id)
 
         if not video:
             return jsonify({"error": "Video not found."}), 404
