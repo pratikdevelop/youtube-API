@@ -31,7 +31,6 @@ jobs:
           echo "AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}" >> .env
           echo "AWS_S3_REGION=${{ secrets.AWS_S3_REGION }}" >> .env
 
-
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -68,16 +67,16 @@ jobs:
       - name: Update OpenShift Deployment with New Image and Env Variables
         run: |
           # Update the deployment with the new Docker image
-          oc set image deployment/socailmedia socialmedia=youtube-app:latest --record
-          oc rollout status deployment/socailmedia
+          oc set image deployment/socialmedia socialmedia=youtube-app:latest --record
+          oc rollout status deployment/socialmedia
 
           # Use .env file to set environment variables
-          oc set env deployment/socailmedia --from-file=.env
+          oc set env deployment/socialmedia --from-file=.env
 
       - name: Expose the OpenShift Service (Route)
         run: |
           # Ensure the service is exposed (creating route if it doesn't exist)
-          oc expose svc/socailmedia  # Expose service (create route)
+          oc expose svc/socialmedia  # Expose service (create route)
 
       - name: Get OpenShift Deployment URL
         run: |

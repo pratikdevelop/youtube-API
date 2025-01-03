@@ -26,6 +26,8 @@ from werkzeug.utils import secure_filename
 from gtts import gTTS  # Google Text-to-Speech
 import datetime
 from pytube import YouTube
+# import cv2
+
 
 # Load environment variables
 load_dotenv()
@@ -53,6 +55,7 @@ CORS(app)
 
 # AWS and MongoDB configuration
 UPLOAD_FOLDER = 'uploads'
+os.chmod(UPLOAD_FOLDER, 0o775)  # Ensure it's writable
 AWS_S3_BUCKET = os.getenv('AWS_S3_BUCKET')
 AWS_S3_REGION = os.getenv('AWS_S3_REGION')
 AWS_ACCESS_KEY = os.getenv('AWS_ACCESS_KEY')
@@ -127,30 +130,89 @@ def get_video_duration(video_file):
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     return float(result.stdout.strip())
 
-def download_social_video(video_url, output_path,format_option='mp4'):
-    # Set up the basic yt-dlp command with the default format option
-    command = ['yt-dlp', '--output', output_path]
-    command.extend(['--format', 'bv+ba/b'])
-    command.extend(['--cookies', 'cookies.txt'])
-    command.append(video_url)
 
-    try:
-        # Debug log for the full command
-        logging.debug(f"Running yt-dlp command: {' '.join(command)}")
+
+
+# def resize_video(input_path, output_path, width=None, height=None):
+#     # Open the input video file
+#     video_capture = cv2.VideoCapture(input_path)
+
+#     # Get the original video's width and height
+#     original_width = int(video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+#     original_height = int(video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+#     # If width and/or height are not provided, use the original dimensions
+#     if not width:
+#         width = original_width
+#     if not height:
+#         height = original_height
+
+#     # Define the codec and create VideoWriter object to save the resized video
+#     fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for MP4
+#     out_video = cv2.VideoWriter(output_path, fourcc, 30.0, (width, height))
+
+#     while video_capture.isOpened():
+#         ret, frame = video_capture.read()
+#         if not ret:
+#             break
+
+#         # Resize the frame
+#         resized_frame = cv2.resize(frame, (width, height))
         
-        # Run the command and capture the result
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+#         # Write the resized frame to the output video
+#         out_video.write(resized_frame)
 
-        # Check if the download was successful
-        if result.returncode == 0:
-            logging.info(f"Video downloaded successfully to: {output_path}")
-        else:
-            logging.error(f"Error downloading video: {result.stderr}")
-            raise Exception(f"Error downloading video: {result.stderr}")
+#     # Release everything when done
+#     video_capture.release()
+#     out_video.release()
+#     cv2.destroyAllWindows()
+
+#     print(f"Video resized and saved as: {output_path}")
+
+
+# import requests
+# import re
+
+def download_social_video(video_url, output_path, format_option='mp4'):
+    unique_id = str(uuid.uuid4())  # Generates a random UUID
+    custom_name = f"video_{unique_id}"  # Prefix with "video_" for clarity
+    try:
+        # Setup yt-dlp options
+        ydl_opts = {
+            'format': 'best',  # Choose the best quality available
+            'outtmpl': os.path.join(UPLOAD_FOLDER, f'{custom_name}.%(ext)s'),  # Output file template
+            'quiet': True,  # Suppress yt-dlp's console output
+        }
+
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            # Extract video information and download
+            info_dict = ydl.extract_info(video_url, download=True)
+
+            video_title = info_dict.get('title', 'facebook_video')  # Get title of the video
+            video_ext = info_dict.get('ext', 'mp4')  # Get file extension (e.g., mp4)
+            video_file = os.path.join(UPLOAD_FOLDER, f"{custom_name}.{video_ext}")
+            s3_url = upload_to_s3(video_file, os.path.basename(video_file))
+
+            # Assuming save_video function is defined elsewhere to save video data to MongoDB
+            video_data = save_video(url, None, [s3_url] , 'youtube')
+
+            # Clean up local video file after upload
+            if os.path.exists(video_file):
+                os.remove(video_file)
+
+            # Return success response with the S3 URL of the uploaded video
+            return jsonify({
+                'videoUrl': s3_url,
+                'message': 'video_url video has been successfully downloaded and stored in MongoDB.',
+            })
+
+    except youtube_dl.DownloadError as e:
+        # Handle errors from youtube_dl
+        return jsonify({'error': 'Failed to download video_url video.', 'details': str(e)}), 500
 
     except Exception as e:
-        logging.error(f"General error downloading video: {e}")
-        raise
+        # Handle other unexpected errors
+        return jsonify({'error': 'Unexpected error occurred.', 'details': str(e)}), 500
 
 
 # Function to upload video to AWS S3
@@ -176,7 +238,7 @@ def process_video():
     video_url = data.get("url")
     segment_length = data.get(
         "segment_length", 60
-    )  # Default to 60 seconds if not provided
+    )
 
     if not video_url:
         return jsonify({"error": "Missing video URL."}), 400
@@ -189,20 +251,44 @@ def process_video():
         return jsonify({"error": "Invalid segment length.", "details": str(e)}), 400
 
     # Set the initial file paths
-    video_file = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4().hex}.webm")
-    mp4_file = os.path.join(
-        UPLOAD_FOLDER, f"{uuid.uuid4().hex}.mp4"
-    )  # Converted MP4 file
-
+    unique_id = str(uuid.uuid4())  # Generates a random UUID
+    custom_name = f"video_{unique_id}"  # Prefix with "video_" for clarity
     try:
-        # Download the WebM video
-        download_social_video(video_url, video_file, "bv+ba/b")
+        # Setup yt-dlp options
+        ydl_opts = {
+            'format': 'best',  # Choose the best quality available
+            'outtmpl': os.path.join(UPLOAD_FOLDER, f'{custom_name}.%(ext)s'),  # Output file template
+            'quiet': True,  # Suppress yt-dlp's console output
+        }
+
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            # Extract video information and download
+            info_dict = ydl.extract_info(video_url, download=True)
+
+            video_title = info_dict.get('title', 'facebook_video')  # Get title of the video
+            video_ext = info_dict.get('ext', 'mp4')  # Get file extension (e.g., mp4)
+            video_file = os.path.join(UPLOAD_FOLDER, f"{custom_name}.{video_ext}")
+            s3_url = upload_to_s3(video_file, os.path.basename(video_file))
+
+            # Assuming save_video function is defined elsewhere to save video data to MongoDB
+            video_data = save_video(video_url, None, [s3_url] , 'youtube')
+
+            # Clean up local video file after upload
+            if os.path.exists(video_file):
+                os.remove(video_file)
+
+            # Return success response with the S3 URL of the uploaded video
+            return jsonify({
+                'videoUrl': s3_url,
+                'message': 'video_url video has been successfully downloaded and stored in MongoDB.',
+            })
+
 
         # Convert WebM to MP4
-        convert_webm_to_mp4(video_file, mp4_file)
+        # convert_webm_to_mp4(video_file, mp4_file)
 
         # Get the duration of the converted MP4 video
-        video_duration = get_video_duration(mp4_file)
+        video_duration = get_video_duration(video_file)
         segment_urls = []
 
         # Split and upload video segments
@@ -247,10 +333,14 @@ def process_video():
         save_video(video_url, segment_length, segment_urls, "youtube")
 
         return jsonify({"videoSegments": segment_urls})
+    except youtube_dl.DownloadError as e:
+        # Handle errors from youtube_dl
+        return jsonify({'error': 'Failed to download video_url video.', 'details': str(e)}), 500
 
     except Exception as e:
         logging.error(f"Error processing video: {e}")
         return jsonify({"error": "Failed to process video", "details": str(e)}), 500
+
 
 def convert_webm_to_mp4(input_file, output_file):
     name, ext = os.path.splitext(input_file)
@@ -335,7 +425,6 @@ def download_facebook():
             video_title = info_dict.get('title', 'facebook_video')  # Get title of the video
             video_ext = info_dict.get('ext', 'mp4')  # Get file extension (e.g., mp4)
             video_file = os.path.join(UPLOAD_FOLDER, f"{custom_name}.{video_ext}")
-            print('Video file:', video_file)
             s3_url = upload_to_s3(video_file, os.path.basename(video_file))
 
             # Assuming save_video function is defined elsewhere to save video data to MongoDB
@@ -530,114 +619,6 @@ def generate_video(image_paths):
     return output_video
 
 
-# @app.route("/generate-video", methods=["POST"])
-# def generate_video_from_script():
-#     script = request.form['script']
-#     title = request.form['videoTitle']
-#     aspect_ratio = request.form['aspectRatio']
-
-
-#     # Process video and generate final output based on selected aspect ratio
-#     video_output_path = os.path.join(UPLOAD_FOLDER, f"{title}.mp4")
-#     process_video_script(media_paths[0], aspect_ratio, video_output_path)
-
-#     # Upload to AWS S3 and save video metadata in MongoDB
-#     s3_url = upload_to_s3(video_output_path, video_output_path)
-#     file_urls = [s3_url]  # Only one URL in this case
-
-#     # Save video metadata in MongoDB
-#     segment_length = None  # Assuming no segmentation needed for Instagram videos
-#     video_data = save_video(title, segment_length, file_urls,'scripted_video')
-
-# def process_video_script(input_video_path, aspect_ratio, output_video_path):
-#     """Process the video based on aspect ratio using FFmpeg."""
-#     if aspect_ratio == "16:9":
-#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1920:1080', output_video_path]
-#     elif aspect_ratio == "4:3":
-#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1440:1080', output_video_path]
-#     elif aspect_ratio == "1:1":
-#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1080:1080', output_video_path]
-#     elif aspect_ratio == "9:16":
-#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1080:1920', output_video_path]
-#     elif aspect_ratio == "21:9":
-#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=2560:1080', output_video_path]
-    
-#     subprocess.run(ffmpeg_command)
-
-# import os
-# import subprocess
-# from flask import Flask, request, jsonify
-# from werkzeug.utils import secure_filename
-# import boto3
-# from pymongo import MongoClient
-
-# app = Flask(__name__)
-
-# # Configure directories, AWS S3, MongoDB, etc.
-# UPLOAD_FOLDER = './uploads'  # Local upload directory (adjust if needed)
-# ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
-# app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-# client = MongoClient("mongodb://localhost:27017/")  # MongoDB connection (update with your URI)
-# db = client['video_database']
-# videos_collection = db['videos']
-
-# # AWS S3 Configuration (example)
-# s3_client = boto3.client('s3')
-# S3_BUCKET = 'your-s3-bucket-name'
-
-# # Helper function to check file extension
-# def allowed_file(filename):
-#     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-# # Route for video generation from script (without media)
-# @app.route("/generate-video", methods=["POST"])
-# def generate_video_from_script():
-#     script = request.form['script']
-#     title = request.form['videoTitle']
-#     aspect_ratio = request.form['aspectRatio']
-
-#     # Set a default input video or any existing media you want to use (e.g., placeholder)
-#     # Assuming you have a default placeholder video you want to use for all scripts.
-#     input_video_path = os.path.join(UPLOAD_FOLDER, 'placeholder.mp4')  # Set path to the input video
-#     if not os.path.exists(input_video_path):
-#         return jsonify({'error': 'Placeholder video not found'}), 400
-
-#     # Generate video based on the script and aspect ratio
-#     video_output_path = os.path.join(UPLOAD_FOLDER, f"{title}.mp4")
-#     process_video_script(input_video_path, aspect_ratio, video_output_path)
-
-#     # Upload to AWS S3 and save metadata
-#     s3_url = upload_to_s3(video_output_path, title)
-#     file_urls = [s3_url]  # Assuming we are dealing with a single video URL
-
-#     # Save video metadata in MongoDB
-#     segment_length = None  # Assuming no segmentation needed for Instagram videos
-#     video_data = save_video(title, segment_length, file_urls, 'scripted_video')
-
-#     # Return success response with metadata
-#     return jsonify({
-#         'message': 'Video generated successfully!',
-#         'video_url': s3_url,
-#         'title': title,
-#         'script': script
-#     })
-
-# def process_video_script(input_video_path, aspect_ratio, output_video_path):
-#     """Process the video based on aspect ratio using FFmpeg."""
-#     if aspect_ratio == "16:9":
-#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1920:1080', output_video_path]
-#     elif aspect_ratio == "4:3":
-#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1440:1080', output_video_path]
-#     elif aspect_ratio == "1:1":
-#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1080:1080', output_video_path]
-#     elif aspect_ratio == "9:16":
-#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=1080:1920', output_video_path]
-#     elif aspect_ratio == "21:9":
-#         ffmpeg_command = ['ffmpeg', '-i', input_video_path, '-vf', 'scale=2560:1080', output_video_path]
-    
-#     subprocess.run(ffmpeg_command)
-
-
 @app.route("/generate-video", methods=["POST"])
 def generate_video_from_script():
     script = request.form['script']
@@ -682,18 +663,7 @@ def create_video_from_audio(audio_path, output_video_path, aspect_ratio):
     # Step 3: Combine background with audio
     video = background.with_audio(audio)
 
-    # Step 4: Resize video to match aspect ratio
-    # if aspect_ratio == "16:9":
-    #     video = video.resize(newsize=(1920, 1080))
-    # elif aspect_ratio == "4:3":
-    #     video = video.resize(newsize=(1440, 1080))
-    # elif aspect_ratio == "1:1":
-    #     video = video.resize(newsize=(1080, 1080))
-    # elif aspect_ratio == "9:16":
-    #     video = video.resize(newsize=(1080, 1920))
-    # elif aspect_ratio == "21:9":
-    #     video = video.resize(newsize=(2560, 1080))
-
+   
     # Step 5: Write the video file
     video.write_videofile(output_video_path, codec='libx264', audio_codec='aac')
 
