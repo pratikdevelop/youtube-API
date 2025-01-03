@@ -20,6 +20,7 @@ python-dotenv
 boto3
 instaloader
 moviepy
+gunicorn
 Flask-PyMongo
 ffmpeg
 gunicorn
