@@ -29,7 +29,6 @@ def init_db(app, mail_instance):
     mongo.db.users.create_index([('email', 1)], unique=True)
 
 
-# Video schema (unchanged)
 class Video:
     def __init__(self, video_url, segment_length, file_urls, video_type):
         self.video_url = video_url
@@ -37,6 +36,7 @@ class Video:
         self.file_urls = file_urls  # This will be a JSON list of file URLs
         self.video_type = video_type  # video_Type of video
         self.created_at = datetime.utcnow()
+        # self.user_id = user_id  # Add user_id field
 
     def to_dict(self):
         """Helper method to convert Video object to dictionary"""
@@ -45,7 +45,8 @@ class Video:
             'segment_length': self.segment_length,
             'file_urls': json.loads(self.file_urls) if isinstance(self.file_urls, str) else self.file_urls,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'video_type': self.video_type
+            'video_type': self.video_type,
+            # 'user_id': self.user_id  # Include user_id
         }
 
 def save_video(video_url, segment_length, file_urls, video_type):

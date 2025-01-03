@@ -1,4 +1,3 @@
-from instascrape import Reel
 from io import BytesIO
 import random
 import string
@@ -26,6 +25,7 @@ import ffmpeg
 from werkzeug.utils import secure_filename
 from gtts import gTTS  # Google Text-to-Speech
 import datetime
+from pytube import YouTube
 
 # Load environment variables
 load_dotenv()
@@ -131,7 +131,7 @@ def download_social_video(video_url, output_path,format_option='mp4'):
     # Set up the basic yt-dlp command with the default format option
     command = ['yt-dlp', '--output', output_path]
     command.extend(['--format', 'bv+ba/b'])
-    # command.extend(['--cookies', 'cookies.txt'])
+    command.extend(['--cookies', 'cookies.txt'])
     command.append(video_url)
 
     try:

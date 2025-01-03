@@ -22,3 +22,5 @@ instaloader
 moviepy
 Flask-PyMongo
 ffmpeg
+gunicorn
+pytube
