@@ -26,6 +26,7 @@ from werkzeug.utils import secure_filename
 from gtts import gTTS  # Google Text-to-Speech
 import datetime
 from pytube import YouTube
+
 # import cv2
 
 
@@ -47,13 +48,9 @@ app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 mail = Mail(app)
-
-# JWT Configuration
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
 jwt = JWTManager(app)
 CORS(app)
-
-# AWS and MongoDB configuration
 UPLOAD_FOLDER = 'uploads'
 os.chmod(UPLOAD_FOLDER, 0o775)  # Ensure it's writable
 AWS_S3_BUCKET = os.getenv('AWS_S3_BUCKET')
@@ -64,7 +61,6 @@ MONGO_URI = os.getenv('MONGO_URI')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MONGO_URI'] = MONGO_URI
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-
 # AWS S3 client setup
 config = Config(retries={'max_attempts': 10, 'mode': 'standard'})
 s3_client = boto3.client('s3', region_name=AWS_S3_REGION, 
