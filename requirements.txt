@@ -1,6 +1,5 @@
 bcrypt
 blinker
-Flask-JWT-Extended
 Flask-Mail
 flask 
 flask_cors
@@ -13,7 +12,6 @@ Pillow
 pydantic
 pydantic_core
 PyJWT
-SecretStorage
 SQLAlchemy
 yt-dlp
 python-dotenv

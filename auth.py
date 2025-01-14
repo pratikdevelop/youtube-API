@@ -2,9 +2,8 @@ import secrets
 from flask import Flask, request, jsonify
 from flask_mail import Mail, Message
 from flask_jwt_extended import jwt_required
-from flask_bcrypt import Bcrypt
-from flask_sqlalchemy import SQLAlchemy
 from models import save_user, get_user_by_email, update_profile, verify_user_password, forgot_password
+from flask_jwt_extended import JWTManager, create_access_token,get_jwt_identity
 # User signup route
 @app.route('/signup', methods=['POST'])
 def signup():

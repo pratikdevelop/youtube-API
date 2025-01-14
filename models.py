@@ -1,14 +1,13 @@
 from flask_mail import Message
 from flask_pymongo import PyMongo
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import logging
 import bcrypt  # For hashing passwords
 from flask import jsonify, request
-import secrets  # For generating the reset token
 from itsdangerous import URLSafeTimedSerializer as Serializer  # For secure token generation
-from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity
 from bson import ObjectId
+from flask_jwt_extended import JWTManager, create_access_token,get_jwt_identity
 
 
 # Initialize PyMongo (MongoDB client)
@@ -16,12 +15,13 @@ mongo = None
 
 # Initialize Flask-Mail (for sending emails)
 mail = None
+jwt = None
 
 # Secret key for JWT token signing
 SECRET_KEY = 'your_secret_key'
 
 def init_db(app, mail_instance):
-    global mongo, mail
+    global mongo, mail, jwt
     mongo = PyMongo(app)  # Initialize PyMongo with the app
     mail = mail_instance  # Set the mail instance for sending emails
     # Ensure the video and user collections are available in MongoDB
@@ -126,21 +126,21 @@ def get_video_by_id(id):
 
 # User schema (modified to work with MongoDB)
 class User:
-    def __init__(self, username, email, password, role='user'):
-        self.username = username
+    def __init__(self, name, email, password,phone ):
+        self.name = name
         self.email = email
         self.password = password  # Unhashed password
-        self.role = role
+        self.phone = phone
         self.created_at = datetime.utcnow()
         self.updated_at = datetime.utcnow()
 
     def to_dict(self):
         """Helper method to convert User object to dictionary"""
         return {
-            'username': self.username,
+            'name': self.name,
             'email': self.email,
             'password': self.password,  # Do NOT return unhashed password in actual use
-            'role': self.role,
+            'phone': self.phone,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S')
         }
@@ -154,8 +154,8 @@ class User:
         return bcrypt.checkpw(password.encode('utf-8'), self.password.encode('utf-8'))
 
 # Function to save a new user (unchanged)
-def save_user(username, email, password, role='user'):
-    user = User(username, email, password, role)
+def save_user(name, email, password, phone):
+    user = User(name, email, password, phone)
     user.hash_password()  # Hash the password before saving
 
     user_data = user.to_dict()
@@ -174,10 +174,11 @@ def get_user_by_email(email):
     user = mongo.db.users.find_one({'email': email})
     if user:
         return {
-            'username': user['username'],
+            'id': user['_id'],
+            'name': user['name'],
             'email': user['email'],
             'password': user['password'],  # Do NOT return unhashed password in actual use
-            'role': user['role'],
+            'phone': user['phone'],
             'created_at': user['created_at']
         }
     return None
@@ -186,7 +187,7 @@ def get_user_by_email(email):
 def verify_user_password(email, password):
     user = get_user_by_email(email)
     if user:
-        user_obj = User(user['username'], user['email'], user['password'], user['role'])
+        user_obj = User(user['name'], user['email'], user['password'], user['role'])
         return user_obj.check_password(password)
     return False
 
@@ -237,23 +238,48 @@ def reset_password(token):
 # Get profile (returns the current user's profile)
 def get_profile():
     current_user = get_jwt_identity()  # Assuming you have a JWT mechanism to get current user
-    user = mongo.db.users.find_one({'username': current_user})
+    print(current_user)
+    user = mongo.db.users.find_one({'email': current_user})
     if not user:
-        return jsonify({"msg": "User not found"}), 404
-    return jsonify({"username": user['username'], "email": user['email']}), 200
+       return None
+    return user
 
 # Update profile (allows the user to update their profile)
 def update_profile():
-    current_user = get_jwt_identity()  # Assuming you have a JWT mechanism to get current user
+    current_user = 'dd'  # Assuming you have a JWT mechanism to get current user
     data = request.json
     new_password = data.get('password')
     
-    user = mongo.db.users.find_one({'username': current_user})
+    user = mongo.db.users.find_one({'name': current_user})
     if not user:
         return jsonify({"msg": "User not found"}), 404
 
     if new_password:
         hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        mongo.db.users.update_one({'username': current_user}, {'$set': {'password': hashed_password}})
+        mongo.db.users.update_one({'name': current_user}, {'$set': {'password': hashed_password}})
     
     return jsonify({"msg": "Profile updated"}), 200
+
+# User login function
+def user_login(email, password):
+   
+
+    if not email or not password:
+        return jsonify({"msg": "Email and password are required"}), 400
+
+    # Check if user exists
+    user = get_user_by_email(email)
+    if not user:
+        return jsonify({"msg": "Invalid email or password"}), 401
+
+    # Verify the password
+    user_obj = User(user['name'], user['email'], user['password'], user['phone'])
+    if not user_obj.check_password(password):
+        return jsonify({"msg": "Invalid email or password"}), 401
+
+    # If credentials are valid, create JWT token (assuming JWT setup is done)
+    access_token = create_access_token(identity=user['email'])    
+    # store this toekn in user scheam
+    mongo.db.users.update_one({'email': user['email']}, {'$set': {'token':access_token}})
+
+    return access_token
