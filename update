@@ -1,0 +1,107 @@
+import torch
+import torch.nn as nn
+import numpy as np
+from qiskit import QuantumCircuit
+from qiskit_aer import AerSimulator
+from flask import Flask, jsonify, request
+from openai import OpenAI
+ 
+# Simplified Generative Model (e.g., a basic GAN generator)
+class Generator(nn.Module):
+    def __init__(self):
+        super(Generator, self).__init__()
+        self.fc = nn.Linear(100, 784)  # For simplicity, generating 28x28 images
+ 
+    def forward(self, x):
+        x = torch.relu(self.fc(x))
+        return x.view(-1, 28, 28)
+ 
+# Quantum Integration (using Qiskit for a simple quantum circuit)
+def quantum_sampling():
+    # Simulate a quantum circuit that returns a "quantum-enhanced" sample
+    qc = QuantumCircuit(2)
+    qc.h(0)
+    qc.cx(0, 1)
+    qc.measure_all()
+    
+    # Use AerSimulator for local simulation
+    simulator = AerSimulator()
+    job = simulator.run(qc, shots=1024)
+    result = job.result()
+    counts = result.get_counts()
+    
+    # Simplified example of using quantum output to influence sampling
+    if counts.get('00', 0) > counts.get('11', 0):
+        return np.random.normal(loc=0, scale=1, size=(100,))
+    else:
+        return np.random.normal(loc=1, scale=1, size=(100,))
+ 
+def train_generator(epochs=100):
+    generator = Generator()
+    optimizer = torch.optim.Adam(generator.parameters(), lr=0.001)
+    rewards = []
+ 
+    for epoch in range(epochs):
+        # Quantum-enhanced sampling for input noise
+        input_noise = torch.tensor(quantum_sampling(), dtype=torch.float32)
+        
+        # Generate Image
+        image = generator(input_noise)
+        
+        # Simplified Reward Calculation (e.g., based on image simplicity)
+        reward = -torch.sum(torch.abs(image - 0.5))  # Example reward function
+        rewards.append(reward.item())
+        
+        # Backpropagate and optimize
+        optimizer.zero_grad()
+        (-reward).backward()  # Minimize negative reward (maximize reward)
+        optimizer.step()
+ 
+        if epoch % 10 == 0:
+            print(f"Epoch {epoch}, Reward: {reward.item()}")
+ 
+    return generator, rewards
+ 
+# Initialize OpenAI client
+client = OpenAI(
+  base_url = "https://integrate.api.nvidia.com/v1",
+  api_key = "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"
+)
+ 
+# Create Flask app
+app = Flask(__name__)
+ 
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "ok"})
+ 
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    user_message = data.get('message', '')
+    if not user_message:
+        return jsonify({"error": "No message provided"}), 400
+ 
+    completion = client.chat.completions.create(
+        model="nvidia/llama-3.1-nemotron-ultra-253b-v1",
+        messages=[
+            {"role": "system", "content": "detailed thinking off"},
+            {"role": "user", "content": user_message}
+        ],
+        temperature=0.6,
+        top_p=0.7,
+        max_tokens=16384,
+        frequency_penalty=0,
+        presence_penalty=0,
+        stream=False
+    )
+    response_text = completion.choices[0].message.content
+    return jsonify({"response": response_text})
+ 
+if __name__ == '__main__':
+    print("Starting training...")
+    trained_generator, training_rewards = train_generator()
+    print("Training completed. Starting Flask server...")
+    app.run(host='0.0.0.0', port=5000)
+ 
+ 
